@@ -10,7 +10,7 @@ export interface DrawingInstance {
   id: string;
   type: string;
   points: DrawingPoint[];
-  series?: any; 
+  series?: any;
   selected: boolean;
   metadata?: any;
   text?: string;
@@ -43,10 +43,10 @@ export function coordinateToTimeEx(chart: any, x: number): Time | null {
   const timeScale = chart.timeScale();
   const directTime = timeScale.coordinateToTime(x);
   if (directTime !== null) return directTime;
-  
+
   const logical = timeScale.coordinateToLogical(x);
   if (logical === null) return null;
-  
+
   const visibleRange = timeScale.getVisibleLogicalRange();
   if (!visibleRange) return null;
 
@@ -57,10 +57,10 @@ export function coordinateToTimeEx(chart: any, x: number): Time | null {
   const t1 = timeToValue(refTime);
   const refPrevTime = timeScale.coordinateToTime(timeScale.logicalToCoordinate(refLogical - 1) || 0);
   const t0 = refPrevTime ? timeToValue(refPrevTime) : t1 - 86400;
-  
+
   const interval = (t1 > t0) ? (t1 - t0) : 86400;
   const diff = logical - refLogical;
-  
+
   const extrapolatedUnix = t1 + Math.round(diff * interval);
   return extrapolatedUnix as any;
 }
@@ -73,35 +73,35 @@ export function snapPointToOHLC(time: Time, price: number, data: any[]): number 
   const val = timeToValue(time);
   const bar = data.find(d => timeToValue(d.time) === val);
   if (!bar) return price;
-  
+
   const points = [bar.open, bar.high, bar.low, bar.close];
-  return points.reduce((prev, curr) => 
+  return points.reduce((prev, curr) =>
     Math.abs(curr - price) < Math.abs(prev - price) ? curr : prev
   );
 }
 
 export function safeSetSeriesData(series: ISeriesApi<any>, data: any[]) {
-    if (!series || !data) return;
-    try {
-        const valid = data.filter(d => d && d.time !== null && d.time !== undefined);
-        if (valid.length === 0) {
-            series.setData([]);
-            return;
-        }
-        const sorted = [...valid].sort((a, b) => timeToValue(a.time) - timeToValue(b.time));
-        const unique = [];
-        for (let i = 0; i < sorted.length; i++) {
-            const currentT = timeToValue(sorted[i].time);
-            if (i === 0 || currentT > timeToValue(unique[unique.length - 1].time)) {
-                unique.push(sorted[i]);
-            } else {
-                unique[unique.length - 1] = sorted[i];
-            }
-        }
-        series.setData(unique);
-    } catch (err) {
-        console.warn('Failed to set series data:', err);
+  if (!series || !data) return;
+  try {
+    const valid = data.filter(d => d && d.time !== null && d.time !== undefined);
+    if (valid.length === 0) {
+      series.setData([]);
+      return;
     }
+    const sorted = [...valid].sort((a, b) => timeToValue(a.time) - timeToValue(b.time));
+    const unique = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const currentT = timeToValue(sorted[i].time);
+      if (i === 0 || currentT > timeToValue(unique[unique.length - 1].time)) {
+        unique.push(sorted[i]);
+      } else {
+        unique[unique.length - 1] = sorted[i];
+      }
+    }
+    series.setData(unique);
+  } catch (err) {
+    console.warn('Failed to set series data:', err);
+  }
 }
 
 /**
@@ -125,23 +125,24 @@ export function activatePositionTool(
     const y = e.clientY - rect.top;
     const time = coordinateToTimeEx(chart, x);
     const price = mainSeries.coordinateToPrice(y);
-    
-    if (time !== null && price !== null) {
-      // 1:1.5 Risk Reward default
-      const tickSize = price * 0.001; 
-      const targetPrice = type === 'long_position' ? price + (tickSize * 30) : price - (tickSize * 30);
-      const stopPrice = type === 'long_position' ? price - (tickSize * 20) : price + (tickSize * 20);
 
-      onComplete({ 
-        id: `${type}_${Date.now()}`, 
-        type: type, 
+    if (time !== null && price !== null) {
+      // Smaller default risk targets so the drawn position appears short by default
+      // Users can drag handles to extend/shrink as desired.
+      const tickSize = price * 0.001;
+      const targetPrice = type === 'long_position' ? price + (tickSize * 3) : price - (tickSize * 3);
+      const stopPrice = type === 'long_position' ? price - (tickSize * 2) : price + (tickSize * 2);
+
+      onComplete({
+        id: `${type}_${Date.now()}`,
+        type: type,
         points: [
           { time, price: targetPrice }, // Point 0: Target
           { time, price: price },       // Point 1: Entry
           { time, price: stopPrice }    // Point 2: Stop
         ],
-        widthLeft: 100,
-        widthRight: 100
+        widthLeft: 40,
+        widthRight: 40
       });
     }
   };
@@ -175,11 +176,11 @@ export function activateTextTool(
     const y = e.clientY - rect.top;
     const time = coordinateToTimeEx(chart, x);
     const price = mainSeries.coordinateToPrice(y);
-    
+
     if (time !== null && price !== null) {
-      onComplete({ 
-        id: `text_${Date.now()}`, 
-        type: 'text', 
+      onComplete({
+        id: `text_${Date.now()}`,
+        type: 'text',
         points: [{ time, price }],
         text: '' // Start with empty text to trigger editor
       });
@@ -215,11 +216,11 @@ export function activateAnchoredVwapTool(
     const y = e.clientY - rect.top;
     const time = coordinateToTimeEx(chart, x);
     const price = mainSeries.coordinateToPrice(y);
-    
+
     if (time !== null && price !== null) {
-      onComplete({ 
-        id: `avwap_${Date.now()}`, 
-        type: 'anchored_vwap', 
+      onComplete({
+        id: `avwap_${Date.now()}`,
+        type: 'anchored_vwap',
         points: [{ time, price }]
       });
     }
@@ -295,7 +296,7 @@ export function activatePatternTool(
 
   const cleanupPreview = () => {
     if (previewSeries) {
-      try { chart.removeSeries(previewSeries); } catch(e) {}
+      try { chart.removeSeries(previewSeries); } catch (e) { }
       previewSeries = null;
     }
   };
@@ -363,7 +364,7 @@ export function activateDrawingTool(
     } else if (state === 'drawing' && p1) {
       onComplete({ id: `${type}_${Date.now()}`, type, points: [p1, pt] });
       // Reset preview and state
-      if (previewSeries) { try { chart.removeSeries(previewSeries); } catch(e) {} previewSeries = null; }
+      if (previewSeries) { try { chart.removeSeries(previewSeries); } catch (e) { } previewSeries = null; }
       p1 = null; state = 'idle';
     }
   };
@@ -386,7 +387,7 @@ export function activateDrawingTool(
 
   const hardCleanup = () => {
     state = 'idle'; p1 = null;
-    if (previewSeries) { try { chart.removeSeries(previewSeries); } catch(e) {} previewSeries = null; }
+    if (previewSeries) { try { chart.removeSeries(previewSeries); } catch (e) { } previewSeries = null; }
   };
 
   return {
@@ -451,11 +452,11 @@ export function activateBrushTool(
     e.preventDefault();
     e.stopPropagation();
     isDrawing = false;
-    
+
     if (points.length > 1) {
       onComplete({ id: `brush_${Date.now()}`, type: 'brush', points: [...points] });
     }
-    
+
     onUpdate([]); // Clear preview
     points = []; // Reset internal state for next stroke
   };
