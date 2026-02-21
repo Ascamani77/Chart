@@ -75,7 +75,16 @@ export const generateMockOHLC = (count: number = 500, interval: 'm' | 'h' | 'd' 
 
 export const generateVolumeData = (ohlc: OHLCData[]): VolumeData[] => {
   return ohlc.map((item) => {
-    // Generate deterministic volume based on the timestamp
+    // If a real volume field exists (populated from live MT5 data), use it.
+    const realVol = (item as any).volume;
+    if (typeof realVol === 'number' && !isNaN(realVol)) {
+      return {
+        time: item.time,
+        value: Math.max(0, Math.floor(realVol)),
+        color: item.close >= item.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+      };
+    }
+    // Otherwise generate deterministic volume based on the timestamp
     const pseudoRandom = (Math.sin(Number(item.time)) + 1) / 2;
     return {
       time: item.time,

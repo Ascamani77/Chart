@@ -63,7 +63,7 @@ export class ReplayManager {
     const closest = this.data.reduce((prev, curr) => {
       return (Math.abs(timeToValue(curr.time) - val) < Math.abs(timeToValue(prev.time) - val) ? curr : prev);
     });
-    
+
     this.state.cutoffTime = timeToValue(closest.time);
     this.state.isSelecting = false;
     this.notify();
@@ -71,7 +71,7 @@ export class ReplayManager {
 
   stepForward(): boolean {
     if (this.state.cutoffTime === null || this.data.length === 0) return false;
-    
+
     const currentIndex = this.data.findIndex(d => timeToValue(d.time) === this.state.cutoffTime);
     if (currentIndex !== -1 && currentIndex < this.data.length - 1) {
       const nextTime = timeToValue(this.data[currentIndex + 1].time);

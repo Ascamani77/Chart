@@ -44,7 +44,7 @@ export async function getHistoricalData(symbol: string, timeframe: string, limit
         if (!r.ok) return [];
         const j = await r.json();
         if (!Array.isArray(j.bars)) return [];
-        const bars = j.bars.map((b: any) => ({ time: Number(b.time), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close) }));
+        const bars = j.bars.map((b: any) => ({ time: Number(b.time), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close), volume: Number(b.volume || b.tick_volume || 0) }));
 
         // If bars are finer than requested timeframe, aggregate client-side to ensure correct buckets
         const timeframeToSeconds = (t: string) => {
@@ -73,16 +73,17 @@ export async function getHistoricalData(symbol: string, timeframe: string, limit
         }
 
         if (srcSec && srcSec < targetSec) {
-            const agg: Record<number, { time: number; open: number; high: number; low: number; close: number }> = {};
+            const agg: Record<number, { time: number; open: number; high: number; low: number; close: number; volume: number }> = {};
             for (const b of bars) {
                 const key = Math.floor(b.time / targetSec) * targetSec;
                 if (!agg[key]) {
-                    agg[key] = { time: key, open: b.open, high: b.high, low: b.low, close: b.close };
+                    agg[key] = { time: key, open: b.open, high: b.high, low: b.low, close: b.close, volume: Number(b.volume || 0) };
                 } else {
                     const a = agg[key];
                     a.high = Math.max(a.high, b.high);
                     a.low = Math.min(a.low, b.low);
                     a.close = b.close;
+                    a.volume = (a.volume || 0) + Number(b.volume || 0);
                 }
             }
             const out = Object.keys(agg).map(k => agg[Number(k)]).sort((x, y) => x.time - y.time);

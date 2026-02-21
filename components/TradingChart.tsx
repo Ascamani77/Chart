@@ -1,22 +1,22 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
-import { 
-  createChart, 
-  ColorType, 
-  ISeriesApi, 
-  IChartApi, 
+import {
+  createChart,
+  ColorType,
+  ISeriesApi,
+  IChartApi,
   Time,
   SeriesType
 } from 'lightweight-charts';
-import { 
-  Scissors, 
-  Trash2, 
-  ArrowUp, 
-  ArrowDown, 
-  ChevronDown, 
-  ChevronUp, 
-  Settings, 
-  Eye, 
-  EyeOff, 
+import {
+  Scissors,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Eye,
+  EyeOff,
   MoreHorizontal,
   Copy,
   PlusCircle,
@@ -100,7 +100,7 @@ const FIB_FAN_LEVELS = [
 ];
 
 const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, ref) => {
-  const { 
+  const {
     data, volumeData, symbol = 'AAPL', timeframe = 'D',
     activeTool, onToolDeactivate, drawings, onDrawingsChange,
     stayInDrawingMode, chartSettings, replayCutoffTime, isReplaySelecting, onSetReplayCutoff,
@@ -112,21 +112,21 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
   const indicatorsRef = useRef<{ [key: string]: ISeriesApi<any> | ISeriesApi<any>[] }>({});
-  
+
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [hoveredDrawingId, setHoveredDrawingId] = useState<string | null>(null);
   const [showDeleteIconId, setShowDeleteIconId] = useState<string | null>(null);
   const [activeBrushPoints, setActiveBrushPoints] = useState<any[]>([]);
-  
+
   const [draggingHandle, setDraggingHandle] = useState<{ drawingId: string, pointIndex: number } | null>(null);
   const [draggingLine, setDraggingLine] = useState<{ drawingId: string, initialPoints: { time: Time, price: number }[], startX: number, startY: number } | null>(null);
-  const [viewportCounter, setViewportCounter] = useState(0); 
-  
+  const [viewportCounter, setViewportCounter] = useState(0);
+
   const [displayOHLC, setDisplayOHLC] = useState<OHLCData | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [showIndicatorLegend, setShowIndicatorLegend] = useState(true);
   const [hiddenIndicators, setHiddenIndicators] = useState<Set<string>>(new Set());
-  
+
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [hoverFormattedTime, setHoverFormattedTime] = useState<string>('');
 
@@ -162,17 +162,17 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     let lastRangeJson = "";
     let lastPriceCoord = 0;
     let animationFrameId: number;
-    
+
     const sync = () => {
       const chart = chartRef.current;
       const series = mainSeriesRef.current;
       if (!chart || !series) return;
-      
+
       const range = chart.timeScale().getVisibleLogicalRange();
       const rangeJson = JSON.stringify(range);
-      
+
       const priceCoord = series.priceToCoordinate(visibleData[0]?.close || 0);
-      
+
       if (rangeJson !== lastRangeJson || priceCoord !== lastPriceCoord) {
         setViewportCounter(v => v + 1);
         lastRangeJson = rangeJson;
@@ -180,7 +180,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
       }
       animationFrameId = requestAnimationFrame(sync);
     };
-    
+
     animationFrameId = requestAnimationFrame(sync);
     return () => cancelAnimationFrame(animationFrameId);
   }, [isReady, visibleData]);
@@ -189,7 +189,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   useEffect(() => {
     if (!chartRef.current) return;
     const canMove = (!isAnyToolActive && !isCurrentlyDrawing && !isReplaySelecting);
-    
+
     chartRef.current.applyOptions({
       handleScroll: {
         mouseWheel: canMove,
@@ -210,7 +210,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     if (!chartRef.current) return;
     chartRef.current.applyOptions({
       crosshair: {
-        mode: isMagnetEnabled ? 1 : 0, 
+        mode: isMagnetEnabled ? 1 : 0,
       }
     });
   }, [isMagnetEnabled]);
@@ -223,20 +223,20 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
 
     chartRef.current.applyOptions({
       layout: {
-        background: canvas.backgroundType === 'Solid' 
+        background: canvas.backgroundType === 'Solid'
           ? { type: ColorType.Solid, color: canvas.background }
           : { type: ColorType.VerticalGradient, topColor: canvas.background, bottomColor: canvas.backgroundGradientEnd },
         textColor: canvas.scaleTextColor,
         fontSize: canvas.scaleFontSize,
       },
       grid: {
-        vertLines: { 
+        vertLines: {
           visible: canvas.gridVisible && (canvas.gridType.includes('Vert') || canvas.gridType === 'Vertical' || canvas.gridType === 'Vert and horz'),
-          color: canvas.gridColor 
+          color: canvas.gridColor
         },
-        horzLines: { 
+        horzLines: {
           visible: canvas.gridVisible && (canvas.gridType.includes('horz') || canvas.gridType === 'Horizontal' || canvas.gridType === 'Vert and horz'),
-          color: canvas.horzGridColor 
+          color: canvas.horzGridColor
         },
       },
       rightPriceScale: {
@@ -283,8 +283,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             id: newDrawing.id,
             type: newDrawing.type as any,
             points: newDrawing.points.map(p => ({
-               time: p.time,
-               price: isMagnetEnabled ? snapPointToOHLC(p.time, p.price, data) : p.price
+              time: p.time,
+              price: isMagnetEnabled ? snapPointToOHLC(p.time, p.price, data) : p.price
             })),
             color: '#2962ff',
             width: 2,
@@ -337,9 +337,9 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
 
     const resizeObserver = new ResizeObserver(() => {
       if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({ 
-          width: chartContainerRef.current.clientWidth, 
-          height: chartContainerRef.current.clientHeight 
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight
         });
         setViewportCounter(v => v + 1);
       }
@@ -367,7 +367,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
 
     const { symbol: symSettings } = chartSettings || { symbol: { borderVisible: true, wickVisible: true, upColor: '#26a69a', downColor: '#ef5350' } };
 
-    switch(style) {
+    switch (style) {
       case 'bars':
         mainSeriesRef.current = chart.addBarSeries({ upColor: TV_GREEN, downColor: TV_RED });
         break;
@@ -375,15 +375,15 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
         mainSeriesRef.current = chart.addLineSeries({ color: TV_ACCENT, lineWidth: 2 });
         break;
       case 'area':
-        mainSeriesRef.current = chart.addAreaSeries({ 
-          lineColor: TV_ACCENT, 
-          topColor: TV_ACCENT + '44', 
-          bottomColor: TV_ACCENT + '00' 
+        mainSeriesRef.current = chart.addAreaSeries({
+          lineColor: TV_ACCENT,
+          topColor: TV_ACCENT + '44',
+          bottomColor: TV_ACCENT + '00'
         });
         break;
       case 'baseline':
         mainSeriesRef.current = chart.addBaselineSeries({
-          baseValue: { type: 'price', price: visibleData[Math.floor(visibleData.length/2)]?.close || 0 },
+          baseValue: { type: 'price', price: visibleData[Math.floor(visibleData.length / 2)]?.close || 0 },
           topFillColor1: TV_GREEN + '44',
           topFillColor2: TV_GREEN + '00',
           topLineColor: TV_GREEN,
@@ -408,10 +408,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
         });
         break;
       default: // candles
-        mainSeriesRef.current = chart.addCandlestickSeries({ 
-          upColor: TV_GREEN, 
-          downColor: TV_RED, 
-          borderVisible: symSettings.borderVisible, 
+        mainSeriesRef.current = chart.addCandlestickSeries({
+          upColor: TV_GREEN,
+          downColor: TV_RED,
+          borderVisible: symSettings.borderVisible,
           wickVisible: symSettings.wickVisible,
           borderUpColor: symSettings.borderVisible ? TV_GREEN : 'transparent',
           borderDownColor: symSettings.borderVisible ? TV_RED : 'transparent',
@@ -428,7 +428,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     }
 
     safeSetSeriesData(mainSeriesRef.current!, finalData);
-    
+
     if (rangeBefore) timeScale.setVisibleLogicalRange(rangeBefore);
     else if (!replayCutoffTime && !isReplaySelecting) timeScale.scrollToRealTime();
   }, [isReady, visibleData, style, TV_GREEN, TV_RED, chartSettings?.symbol]);
@@ -438,48 +438,48 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     if (!isReady || !chartRef.current || !visibleData.length) return;
     const chart = chartRef.current as any;
     const updateIndicator = (id: string, show: boolean, calculate: () => any, color: string, pane?: string) => {
-        if (indicatorsRef.current[id]) {
-            const series = indicatorsRef.current[id];
-            if (Array.isArray(series)) series.forEach(s => chart.removeSeries(s));
-            else chart.removeSeries(series);
-            delete indicatorsRef.current[id];
+      if (indicatorsRef.current[id]) {
+        const series = indicatorsRef.current[id];
+        if (Array.isArray(series)) series.forEach(s => chart.removeSeries(s));
+        else chart.removeSeries(series);
+        delete indicatorsRef.current[id];
+      }
+      if (show) {
+        const result = calculate();
+        const isVisible = !hiddenIndicators.has(id);
+        if (id === 'bb') {
+          const u = chart.addLineSeries({ color, lineWidth: 1, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
+          const m = chart.addLineSeries({ color, lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
+          const l = chart.addLineSeries({ color, lineWidth: 1, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
+          safeSetSeriesData(u, result.upper); safeSetSeriesData(m, result.middle); safeSetSeriesData(l, result.lower);
+          indicatorsRef.current[id] = [u, m, l];
+        } else if (id === 'vol') {
+          const s = chart.addHistogramSeries({ color: TV_GREEN + '88', priceScaleId: 'volume', visible: isVisible });
+          chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+          safeSetSeriesData(s, result);
+          indicatorsRef.current[id] = s;
+        } else {
+          const s = chart.addLineSeries({
+            color,
+            lineWidth: 1.5,
+            priceScaleId: pane,
+            lastValueVisible: !pane,
+            priceLineVisible: false,
+            visible: isVisible,
+            crosshairMarkerVisible: true,
+            crosshairMarkerRadius: 4,
+          });
+          if (pane) chart.priceScale(pane).applyOptions({ scaleMargins: { top: 0.8, bottom: 0.05 }, borderVisible: false });
+          safeSetSeriesData(s, result);
+          indicatorsRef.current[id] = s;
         }
-        if (show) {
-            const result = calculate();
-            const isVisible = !hiddenIndicators.has(id);
-            if (id === 'bb') {
-                const u = chart.addLineSeries({ color, lineWidth: 1, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
-                const m = chart.addLineSeries({ color, lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
-                const l = chart.addLineSeries({ color, lineWidth: 1, lastValueVisible: false, priceLineVisible: false, visible: isVisible });
-                safeSetSeriesData(u, result.upper); safeSetSeriesData(m, result.middle); safeSetSeriesData(l, result.lower);
-                indicatorsRef.current[id] = [u, m, l];
-            } else if (id === 'vol') {
-                const s = chart.addHistogramSeries({ color: TV_GREEN + '88', priceScaleId: 'volume', visible: isVisible });
-                chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-                safeSetSeriesData(s, result);
-                indicatorsRef.current[id] = s;
-            } else {
-                const s = chart.addLineSeries({ 
-                    color, 
-                    lineWidth: 1.5, 
-                    priceScaleId: pane, 
-                    lastValueVisible: !pane, 
-                    priceLineVisible: false, 
-                    visible: isVisible,
-                    crosshairMarkerVisible: true,
-                    crosshairMarkerRadius: 4,
-                });
-                if (pane) chart.priceScale(pane).applyOptions({ scaleMargins: { top: 0.8, bottom: 0.05 }, borderVisible: false });
-                safeSetSeriesData(s, result);
-                indicatorsRef.current[id] = s;
-            }
-        }
+      }
     };
     updateIndicator('rsi', props.showRsi, () => calculateRSI(visibleData, props.rsiPeriod), '#9575cd', 'rsi');
     updateIndicator('ema10', props.showEma10, () => calculateEMA(visibleData, props.ema10Period), '#42a5f5');
     updateIndicator('ema20', props.showEma20, () => calculateEMA(visibleData, props.ema20Period), '#ffa726');
-    updateIndicator('sma1', props.showSma1, () => calculateSMA(visibleData, props.sma1Period), '#089981'); 
-    updateIndicator('sma2', props.showSma2, () => calculateSMA(visibleData, props.sma2Period), '#2962ff'); 
+    updateIndicator('sma1', props.showSma1, () => calculateSMA(visibleData, props.sma1Period), '#089981');
+    updateIndicator('sma2', props.showSma2, () => calculateSMA(visibleData, props.sma2Period), '#2962ff');
     updateIndicator('vwap', props.showVwap, () => calculateVWAP(visibleData, volumeData), '#ffb74d');
     updateIndicator('bb', props.showBb, () => calculateBollingerBands(visibleData, props.bbPeriod, props.bbMultiplier), 'rgba(66, 165, 245, 0.4)');
     updateIndicator('atr', props.showAtr, () => calculateATR(visibleData, props.atrPeriod), TV_RED, 'atr');
@@ -521,8 +521,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const onLinePointerDown = (e: React.PointerEvent, drawingId: string) => {
     e.stopPropagation(); e.preventDefault();
     const isAlreadySelected = selectedDrawingId === drawingId;
-    setSelectedDrawingId(drawingId); 
-    
+    setSelectedDrawingId(drawingId);
+
     if (isAlreadySelected && !isLocked) {
       setShowDeleteIconId(drawingId);
     } else {
@@ -552,7 +552,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
       if (draggingHandle) {
         const timeScale = chartRef.current!.timeScale();
         const series = mainSeriesRef.current!;
-        
+
         onDrawingsChange(prev => prev.map(d => {
           if (d.id === draggingHandle.drawingId) {
             if (draggingHandle.pointIndex === 3) {
@@ -673,7 +673,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const handleContextAction = (action: string) => {
     if (!contextMenu) return;
     const drawingId = contextMenu.drawingId;
-    
+
     switch (action) {
       case 'remove':
         if (drawingId) handleDeleteDrawing(drawingId);
@@ -704,27 +704,27 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     if (!isReady || !chartRef.current || !mainSeriesRef.current) return [];
     const timeScale = chartRef.current.timeScale();
     const series = mainSeriesRef.current;
-    
+
     return drawings.map(d => {
-      return { 
-        ...d, 
+      return {
+        ...d,
         pixels: d.points.map(p => {
           let x = timeScale.timeToCoordinate(p.time);
           if (x === null) {
-             const targetVal = timeToValue(p.time);
-             let closestIdx = 0;
-             let minDiff = Infinity;
-             for (let i = 0; i < data.length; i++) {
-                const diff = Math.abs(timeToValue(data[i].time) - targetVal);
-                if (diff < minDiff) {
-                   minDiff = diff;
-                   closestIdx = i;
-                }
-             }
-             x = timeScale.logicalToCoordinate(closestIdx as any);
+            const targetVal = timeToValue(p.time);
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let i = 0; i < data.length; i++) {
+              const diff = Math.abs(timeToValue(data[i].time) - targetVal);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+              }
+            }
+            x = timeScale.logicalToCoordinate(closestIdx as any);
           }
           return { x, y: series.priceToCoordinate(p.price) };
-        }) 
+        })
       };
     });
   }, [drawings, viewportCounter, isReady, data]);
@@ -778,28 +778,28 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             {label}
           </span>
           <div className="flex items-center ml-2 bg-[#1c1c1c]/95 border border-[#363a45] rounded-full px-1.5 py-0.5 space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg">
-            <button 
+            <button
               onClick={(e) => { e.stopPropagation(); toggleIndicatorHidden(id); }}
               className={`p-0.5 hover:text-white transition-colors ${isHidden ? 'text-blue-500' : 'text-gray-500'}`}
               title={isHidden ? "Show" : "Hide"}
             >
               {isHidden ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
-            <button 
+            <button
               onClick={(e) => { e.stopPropagation(); props.onOpenSettings(settingsId); }}
               className="p-0.5 text-gray-500 hover:text-white transition-colors"
               title="Settings"
             >
               <Settings size={11} />
             </button>
-            <button 
+            <button
               onClick={(e) => { e.stopPropagation(); props.onRemoveIndicator(id); }}
               className="p-0.5 text-gray-500 hover:text-[#f23645] transition-colors"
               title="Remove"
             >
               <Trash2 size={11} />
             </button>
-            <button 
+            <button
               className="p-0.5 text-gray-500 hover:text-white transition-colors"
               title="More"
             >
@@ -819,21 +819,21 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const statusLine = chartSettings?.statusLine || { logo: true, symbol: true, titleMode: 'Description', openMarketStatus: true, ohlc: true, indicatorTitles: true, volume: true };
 
   return (
-    <div 
-      className={`w-full h-full relative overflow-hidden bg-[#1c1c1c] ${isAnyToolActive ? 'cursor-crosshair' : ''}`} 
-      onPointerDown={handleContainerPointerDown} 
+    <div
+      className={`w-full h-full relative overflow-hidden bg-[#1c1c1c] ${isAnyToolActive ? 'cursor-crosshair' : ''}`}
+      onPointerDown={handleContainerPointerDown}
       onMouseMove={handleMouseMove}
       onContextMenu={handleContextMenu}
     >
       <div ref={chartContainerRef} className="w-full h-full" />
-      
+
       {isAnyToolActive && (
         <div ref={drawingSurfaceRef} className="absolute inset-0 z-[60] bg-transparent cursor-crosshair" />
       )}
 
       {/* Context Menu Rendering */}
       {contextMenu && (
-        <div 
+        <div
           className="fixed z-[1000] bg-[#1e222d] border border-[#363a45] rounded-sm shadow-2xl py-1 min-w-[200px] animate-in fade-in zoom-in-95 duration-100"
           style={{ left: contextMenu.x + 10, top: contextMenu.y + 10 }}
         >
@@ -879,10 +879,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
       )}
 
       {textInputState && isVisible && (
-        <div 
+        <div
           className="absolute z-[1000] pointer-events-auto"
-          style={{ 
-            left: textInputState.x - 4, 
+          style={{
+            left: textInputState.x - 4,
             top: textInputState.y,
           }}
         >
@@ -916,9 +916,9 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           const isSelected = d.id === selectedDrawingId;
           const isHovered = d.id === hoveredDrawingId;
           if (d.type !== 'anchored_vwap' && d.pixels.some(p => p.x === null || p.y === null)) return null;
-          const onLineDoubleClick = (e: any, id: string) => { 
+          const onLineDoubleClick = (e: any, id: string) => {
             if (isLocked) return;
-            e.stopPropagation(); e.preventDefault(); setShowDeleteIconId(id); setSelectedDrawingId(id); 
+            e.stopPropagation(); e.preventDefault(); setShowDeleteIconId(id); setSelectedDrawingId(id);
           };
 
           if (d.type === 'anchored_vwap') {
@@ -962,16 +962,16 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const fillPoints = [...pointsLower, ...upperRev].join(' ');
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <polygon points={fillPoints} fill="rgba(8, 153, 129, 0.08)" stroke="none" />
                 <polyline points={pointsUpper.join(' ')} fill="none" stroke="#089981" strokeWidth={1} opacity="0.6" />
                 <polyline points={pointsLower.join(' ')} fill="none" stroke="#089981" strokeWidth={1} opacity="0.6" />
                 <polyline points={pointsVWAP.join(' ')} fill="none" stroke={isSelected || isHovered ? '#fff' : '#2962ff'} strokeWidth={isSelected ? 3 : 2} strokeLinecap="round" />
                 {anchorX !== null && anchorY !== null && isSelected && (
-                   <circle cx={anchorX} cy={anchorY} r={6} fill="white" stroke="#2962ff" strokeWidth={1.5} onPointerDown={(e) => onHandlePointerDown(e, d.id, 0)} className="cursor-move" />
+                  <circle cx={anchorX} cy={anchorY} r={6} fill="white" stroke="#2962ff" strokeWidth={1.5} onPointerDown={(e) => onHandlePointerDown(e, d.id, 0)} className="cursor-move" />
                 )}
               </g>
             );
@@ -991,10 +991,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const largeArcFlag = Math.abs(diff) > Math.PI ? 1 : 0;
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <line x1={p0.x!} y1={p0.y!} x2={p1.x!} y2={p1.y!} stroke={isSelected || isHovered ? '#fff' : d.color} strokeWidth={1.5} opacity="0.8" />
                 <line x1={p0.x!} y1={p0.y!} x2={p2.x!} y2={p2.y!} stroke={isSelected || isHovered ? '#fff' : d.color} strokeWidth={1.5} opacity="0.8" />
                 <path d={`M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArcFlag} ${sweepFlag} ${p2.x} ${p2.y} Z`} fill="rgba(41, 98, 255, 0.25)" stroke={isSelected || isHovered ? '#fff' : d.color} strokeWidth={isSelected ? 2.5 : 1.5} />
@@ -1028,10 +1028,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const levels = FIB_FAN_LEVELS;
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <line x1={originX} y1={targetY} x2={targetX} y2={targetY} stroke="#787b86" strokeWidth={1} strokeDasharray="3 3" opacity="0.4" />
                 <line x1={targetX} y1={originY} x2={targetX} y2={targetY} stroke="#787b86" strokeWidth={1} strokeDasharray="3 3" opacity="0.4" />
                 <line x1={originX} y1={originY} x2={targetX} y2={targetY} stroke={d.color} strokeWidth={isSelected ? 2 : 1} />
@@ -1079,12 +1079,12 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const h = Math.abs(p1.y! - p2.y!);
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <rect x={minX} y={minY} width={w} height={h} fill={`${d.color}15`} stroke={isSelected || isHovered ? '#fff' : d.color} strokeWidth={isSelected ? 2.5 : 1.5} />
-                {d.text && (<text x={minX + w/2} y={minY + h/2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="13" fontWeight="bold" style={{ pointerEvents: 'none' }}>{d.text}</text>)}
+                {d.text && (<text x={minX + w / 2} y={minY + h / 2} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="13" fontWeight="bold" style={{ pointerEvents: 'none' }}>{d.text}</text>)}
                 {isSelected && (
                   <>
                     <circle cx={p1.x!} cy={p1.y!} r={5} fill="white" stroke="#2962ff" strokeWidth={1.5} onPointerDown={(e) => onHandlePointerDown(e, d.id, 0)} className="cursor-move" />
@@ -1102,10 +1102,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const midX = minX + w / 2, arrowSize = 10, arrowDir = p2.y! > p1.y! ? 1 : -1;
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <rect x={minX} y={minY} width={w} height={h} fill="rgba(41, 98, 255, 0.15)" stroke="#2962ff" strokeWidth={1.5} />
                 <line x1={midX} y1={p1.y!} x2={midX} y2={p2.y!} stroke="#2962ff" strokeWidth={1.5} />
                 <path d={`M ${midX - 7} ${p2.y! - arrowSize * arrowDir} L ${midX} ${p2.y!} L ${midX + 7} ${p2.y! - arrowSize * arrowDir}`} fill="none" stroke="#2962ff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -1129,10 +1129,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const leftX = Math.min(p1.x!, p2.x!), rightX = Math.max(p1.x!, p2.x!), width = Math.abs(p1.x! - p2.x!);
             return (
               <g key={d.id} className="pointer-events-auto cursor-pointer"
-                 onPointerEnter={() => setHoveredDrawingId(d.id)}
-                 onPointerLeave={() => setHoveredDrawingId(null)}
-                 onPointerDown={(e) => onLinePointerDown(e, d.id)}
-                 onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                onPointerEnter={() => setHoveredDrawingId(d.id)}
+                onPointerLeave={() => setHoveredDrawingId(null)}
+                onPointerDown={(e) => onLinePointerDown(e, d.id)}
+                onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <line x1={p1.x!} y1={p1.y!} x2={p2.x!} y2={p2.y!} stroke="#787b86" strokeWidth={1} strokeDasharray="4" opacity="0.6" />
                 {levels.map((lvl, idx) => {
                   const nextLvl = levels[idx + 1];
@@ -1161,8 +1161,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             const profitY = Math.min(pTarget.y!, pEntry.y!), profitH = Math.abs(pTarget.y! - pEntry.y!), lossY = Math.min(pEntry.y!, pStop.y!), lossH = Math.abs(pStop.y! - pEntry.y!);
             const targetDiff = Math.abs(priceTarget - priceEntry), stopDiff = Math.abs(priceEntry - priceStop), targetPct = (targetDiff / priceEntry) * 100, stopPct = (stopDiff / priceEntry) * 100, rr = (targetDiff / stopDiff).toFixed(2);
             return (
-              <g key={d.id} className="pointer-events-auto cursor-pointer" 
-                 onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+              <g key={d.id} className="pointer-events-auto cursor-pointer"
+                onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
                 <rect x={left} y={profitY} width={boxWidth} height={profitH} fill={profitColor} />
                 <rect x={left} y={lossY} width={boxWidth} height={lossH} fill={lossColor} />
                 <line x1={left} y1={pEntry.y!} x2={left + boxWidth} y2={pEntry.y!} stroke="white" strokeWidth={1} strokeDasharray="4" opacity="0.6" />
@@ -1185,8 +1185,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           if (d.type === 'text') {
             const pt = d.pixels[0];
             return (
-              <g key={d.id} className="pointer-events-auto cursor-text" 
-                 onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => handleTextDoubleClick(e, d)}>
+              <g key={d.id} className="pointer-events-auto cursor-text"
+                onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => handleTextDoubleClick(e, d)}>
                 <rect x={pt.x! - 4} y={pt.y! - 18} width={(d.text?.length || 8) * 8} height={24} fill="transparent" stroke={isSelected ? '#2962ff' : 'transparent'} strokeWidth={1} />
                 <text x={pt.x} y={pt.y} fill={isHovered || isSelected ? '#fff' : '#d1d4dc'} fontSize="13" fontFamily="Inter, sans-serif" fontWeight="500">{d.text || ''}</text>
               </g>
@@ -1196,10 +1196,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           if (d.type === 'brush') {
             const pointsStr = d.pixels.map(p => `${p.x},${p.y}`).join(' ');
             return (
-                <g key={d.id} className="pointer-events-auto cursor-pointer" onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
-                    <polyline points={pointsStr} fill="none" stroke="transparent" strokeWidth={15} />
-                    <polyline points={pointsStr} fill="none" stroke={isSelected || isHovered ? '#2962ff' : d.color} strokeWidth={isSelected ? 3 : 2} strokeLinecap="round" strokeLinejoin="round" />
-                </g>
+              <g key={d.id} className="pointer-events-auto cursor-pointer" onPointerEnter={() => setHoveredDrawingId(d.id)} onPointerLeave={() => setHoveredDrawingId(null)} onPointerDown={(e) => onLinePointerDown(e, d.id)} onDoubleClick={(e) => onLineDoubleClick(e, d.id)}>
+                <polyline points={pointsStr} fill="none" stroke="transparent" strokeWidth={15} />
+                <polyline points={pointsStr} fill="none" stroke={isSelected || isHovered ? '#2962ff' : d.color} strokeWidth={isSelected ? 3 : 2} strokeLinecap="round" strokeLinejoin="round" />
+              </g>
             );
           }
 
@@ -1268,7 +1268,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             <div className="bg-[#1e222d] border border-[#363a45] rounded-lg shadow-2xl flex items-center p-1.5 space-x-1.5">
               {d.type === 'rectangle' && (
                 <>
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setShowRectangleColorsId(showRectangleColorsId === d.id ? null : d.id); }}
                     className={`p-1.5 rounded transition-colors ${showRectangleColorsId === d.id ? 'bg-[#2962ff] text-white' : 'text-gray-400 hover:text-white'}`}
                     title="Settings"
@@ -1276,16 +1276,16 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
                     <Settings size={16} />
                   </button>
                   {showRectangleColorsId === d.id && (
-                    <RectangleSettingsModal 
-                      drawing={d} 
-                      onClose={() => setShowRectangleColorsId(null)} 
-                      onUpdate={(updates) => handleUpdateDrawing(d.id, updates)} 
+                    <RectangleSettingsModal
+                      drawing={d}
+                      onClose={() => setShowRectangleColorsId(null)}
+                      onUpdate={(updates) => handleUpdateDrawing(d.id, updates)}
                     />
                   )}
                 </>
               )}
-              <button 
-                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteDrawing(d.id); }} 
+              <button
+                onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteDrawing(d.id); }}
                 className="bg-[#f23645]/10 hover:bg-[#f23645] text-[#f23645] hover:text-white p-1.5 rounded transition-all active:scale-90 flex items-center justify-center border border-[#f23645]/20"
                 title="Delete"
               >
@@ -1307,67 +1307,67 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
         </div>
       )}
       {replayCutoffTime && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.03]"><span className="text-[120px] font-black text-white uppercase tracking-tighter whitespace-nowrap">Bar Replay</span></div>}
-      
+
       <div className="absolute top-2 left-2 z-[500] pointer-events-none select-none flex flex-col space-y-2">
         <div className="flex flex-col">
-            <div className="flex items-center space-x-2">
-              {statusLine.logo && <PairIcons symbol={symbol} size={14} />}
-              {statusLine.symbol && (
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-[13px] font-bold text-gray-100 uppercase tracking-tight">
-                    {statusLine.titleMode === 'Ticker' ? symbol : symbol}
-                  </span>
-                  <span className="text-[11px] text-gray-500 font-medium">· {timeframe}</span>
-                </div>
-              )}
-            </div>
-            {displayOHLC && statusLine.ohlc && (
-              <div className="flex space-x-2 text-[10px] font-mono mt-0.5 ml-0">
-                <span className="text-gray-400">O<span className="text-[#089981] ml-0.5">{displayOHLC.open}</span></span>
-                <span className="text-gray-400">H<span className="text-[#089981] ml-0.5">{displayOHLC.high}</span></span>
-                <span className="text-gray-400">L<span className="text-[#f23645] ml-0.5">{displayOHLC.low}</span></span>
-                <span className="text-gray-400">C<span className="text-white ml-0.5 font-bold">{displayOHLC.close}</span></span>
+          <div className="flex items-center space-x-2">
+            {statusLine.logo && <PairIcons symbol={symbol} size={14} />}
+            {statusLine.symbol && (
+              <div className="flex items-center space-x-1.5">
+                <span className="text-[13px] font-bold text-gray-100 uppercase tracking-tight">
+                  {statusLine.titleMode === 'Ticker' ? symbol : symbol}
+                </span>
+                <span className="text-[11px] text-gray-500 font-medium">· {timeframe}</span>
               </div>
             )}
+          </div>
+          {displayOHLC && statusLine.ohlc && (
+            <div className="flex space-x-2 text-[10px] font-mono mt-0.5 ml-0">
+              <span className="text-gray-400">O<span className="text-[#089981] ml-0.5">{displayOHLC.open}</span></span>
+              <span className="text-gray-400">H<span className="text-[#089981] ml-0.5">{displayOHLC.high}</span></span>
+              <span className="text-gray-400">L<span className="text-[#f23645] ml-0.5">{displayOHLC.low}</span></span>
+              <span className="text-gray-400">C<span className="text-white ml-0.5 font-bold">{displayOHLC.close}</span></span>
+            </div>
+          )}
         </div>
 
         {chartSettings?.trading.buySellButtons && (
           <div className="flex items-center space-x-0.5 pointer-events-auto">
             <button className="flex flex-col items-center bg-[#f23645] hover:bg-[#d32f2f] px-2 py-[3px] rounded-l-md transition-colors shadow-lg active:scale-95 group">
-               <span className="text-[8.5px] font-bold text-white uppercase tracking-tighter">Sell</span>
-               <span className="text-[10.5px] font-bold text-white tabular-nums">{displayOHLC?.close.toFixed(2) || '0.00'}</span>
+              <span className="text-[8.5px] font-bold text-white uppercase tracking-tighter">Sell</span>
+              <span className="text-[10.5px] font-bold text-white tabular-nums">{displayOHLC?.close.toFixed(2) || '0.00'}</span>
             </button>
             <div className="w-[19px] h-[26px] flex items-center justify-center bg-black/40 text-[8.5px] font-bold text-gray-400 border-x border-[#363a45]">
-               40
+              40
             </div>
             <button className="flex flex-col items-center bg-[#2962ff] hover:bg-[#1e4bd8] px-2 py-[3px] rounded-r-md transition-colors shadow-lg active:scale-95 group">
-               <span className="text-[8.5px] font-bold text-white uppercase tracking-tighter">Buy</span>
-               <span className="text-[10.5px] font-bold text-white tabular-nums">{(displayOHLC?.close || 0 + 0.05).toFixed(2)}</span>
+              <span className="text-[8.5px] font-bold text-white uppercase tracking-tighter">Buy</span>
+              <span className="text-[10.5px] font-bold text-white tabular-nums">{(displayOHLC?.close || 0 + 0.05).toFixed(2)}</span>
             </button>
           </div>
         )}
 
         <div className="flex flex-col ml-1 pointer-events-auto">
-           {showIndicatorLegend && (
-             <div className="flex flex-col space-y-0.5 mb-1">
-                {props.showVolume && statusLine.volume && (<IndicatorRow id="vol" label="Volume" value="40" color="#089981" settingsId="vol" />)}
-                {statusLine.indicatorTitles && (
-                  <>
-                    {props.showSma1 && (<IndicatorRow id="sma1" label={`SMA ${props.sma1Period} close`} value="59.375" color="#089981" settingsId="sma1" />)}
-                    {props.showSma2 && (<IndicatorRow id="sma2" label={`SMA ${props.sma2Period} close`} value="59.390" color="#2962ff" settingsId="sma2" />)}
-                    {props.showEma10 && (<IndicatorRow id="ema10" label={`EMA ${props.ema10Period} close`} value="0.00" color="#42a5f5" settingsId="ema10" />)}
-                    {props.showEma20 && (<IndicatorRow id="ema20" label={`EMA ${props.ema20Period} close`} value="0.00" color="#ffa726" settingsId="ema20" />)}
-                    {props.showRsi && (<IndicatorRow id="rsi" label={`RSI ${props.rsiPeriod} close`} value="50.00" color="#9575cd" settingsId="rsi" />)}
-                    {props.showVwap && (<IndicatorRow id="vwap" label="VWAP" value="0.00" color="#ffb74d" settingsId="vwap" />)}
-                    {props.showBb && (<IndicatorRow id="bb" label={`BB ${props.bbPeriod}`} value="0.00" color="rgba(66, 165, 245, 0.4)" settingsId="bb" />)}
-                    {props.showAtr && (<IndicatorRow id="atr" label={`ATR ${props.atrPeriod}`} value="0.00" color={TV_RED} settingsId="atr" />)}
-                  </>
-                )}
-             </div>
-           )}
-           <button onClick={() => setShowIndicatorLegend(!showIndicatorLegend)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-white transition-colors">
-              {showIndicatorLegend ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-           </button>
+          {showIndicatorLegend && (
+            <div className="flex flex-col space-y-0.5 mb-1">
+              {props.showVolume && statusLine.volume && (<IndicatorRow id="vol" label="Volume" value="40" color="#089981" settingsId="vol" />)}
+              {statusLine.indicatorTitles && (
+                <>
+                  {props.showSma1 && (<IndicatorRow id="sma1" label={`SMA ${props.sma1Period} close`} value="59.375" color="#089981" settingsId="sma1" />)}
+                  {props.showSma2 && (<IndicatorRow id="sma2" label={`SMA ${props.sma2Period} close`} value="59.390" color="#2962ff" settingsId="sma2" />)}
+                  {props.showEma10 && (<IndicatorRow id="ema10" label={`EMA ${props.ema10Period} close`} value="0.00" color="#42a5f5" settingsId="ema10" />)}
+                  {props.showEma20 && (<IndicatorRow id="ema20" label={`EMA ${props.ema20Period} close`} value="0.00" color="#ffa726" settingsId="ema20" />)}
+                  {props.showRsi && (<IndicatorRow id="rsi" label={`RSI ${props.rsiPeriod} close`} value="50.00" color="#9575cd" settingsId="rsi" />)}
+                  {props.showVwap && (<IndicatorRow id="vwap" label="VWAP" value="0.00" color="#ffb74d" settingsId="vwap" />)}
+                  {props.showBb && (<IndicatorRow id="bb" label={`BB ${props.bbPeriod}`} value="0.00" color="rgba(66, 165, 245, 0.4)" settingsId="bb" />)}
+                  {props.showAtr && (<IndicatorRow id="atr" label={`ATR ${props.atrPeriod}`} value="0.00" color={TV_RED} settingsId="atr" />)}
+                </>
+              )}
+            </div>
+          )}
+          <button onClick={() => setShowIndicatorLegend(!showIndicatorLegend)} className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-white transition-colors">
+            {showIndicatorLegend ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
       </div>
     </div>

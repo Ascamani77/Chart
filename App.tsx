@@ -336,7 +336,7 @@ const App: React.FC = () => {
             if (!last) {
               // no historical bars — align to standard bucket
               const barTime = Math.floor(tickTime / intervalSec) * intervalSec;
-              const newBar = { time: barTime, open: price, high: price, low: price, close: price } as any;
+              const newBar = { time: barTime, open: price, high: price, low: price, close: price, volume: Number(tick.volume || 0) } as any;
               return prev.concat(newBar).slice(-chartDataConfig.count);
             }
 
@@ -347,6 +347,7 @@ const App: React.FC = () => {
               updated.close = price;
               updated.high = Math.max(updated.high, price);
               updated.low = Math.min(updated.low, price);
+              updated.volume = (Number(updated.volume || 0) + Number(tick.volume || 0));
               const copy = prev.slice();
               copy[copy.length - 1] = updated;
               return copy;
@@ -355,7 +356,7 @@ const App: React.FC = () => {
               const index = Math.floor(elapsed / intervalSec);
               const newBarTime = last.time + index * intervalSec;
               const openPrice = last.close;
-              const newBar = { time: newBarTime, open: openPrice, high: Math.max(openPrice, price), low: Math.min(openPrice, price), close: price } as any;
+              const newBar = { time: newBarTime, open: openPrice, high: Math.max(openPrice, price), low: Math.min(openPrice, price), close: price, volume: Number(tick.volume || 0) } as any;
               const next = prev.concat(newBar).slice(-chartDataConfig.count);
               return next;
             }

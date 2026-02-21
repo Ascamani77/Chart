@@ -67,7 +67,13 @@ async def handle_historical(request):
         bars = []
         if rates is not None:
             for r in rates:
-                bars.append({'time': int(r['time']), 'open': r['open'], 'high': r['high'], 'low': r['low'], 'close': r['close']})
+                # include volume if available (tick_volume or real_volume)
+                vol = 0
+                try:
+                    vol = int(r.get('tick_volume') or r.get('real_volume') or 0)
+                except Exception:
+                    vol = 0
+                bars.append({'time': int(r['time']), 'open': r['open'], 'high': r['high'], 'low': r['low'], 'close': r['close'], 'volume': vol})
         # If MT5 returned finer-resolution bars (e.g. 1m) for a coarser requested timeframe
         # aggregate them into the requested timeframe buckets so frontend receives correct bars.
         def tf_to_seconds(tfs: str) -> int:
