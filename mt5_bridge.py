@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import time
+import socket
 from aiohttp import web
 import websockets
 import MetaTrader5 as mt5
@@ -12,6 +13,36 @@ import MetaTrader5 as mt5
 HTTP_PORT = int(os.environ.get('MT5_BRIDGE_PORT', '62100'))
 clients = set()
 subscriptions = {}   # broker_symbol -> set of websocket clients
+
+def find_free_port(start_port=62100, range_size=50, extra_ranges=None):
+    """Find the first available port starting from start_port.
+
+    Tries the primary range `start_port..start_port+range_size-1`, then any
+    `extra_ranges` provided as a list of (start, end) tuples. Returns the first
+    bindable port or raises RuntimeError with a sample of bind errors.
+    """
+    tried = []
+    ranges = [(start_port, start_port + range_size - 1)]
+    if extra_ranges:
+        ranges.extend(extra_ranges)
+    else:
+        # fallback higher range to avoid common low ephemeral collisions
+        ranges.append((63000, 63050))
+
+    for (s, e) in ranges:
+        for port in range(s, e + 1):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind(('127.0.0.1', port))
+                sock.close()
+                return port
+            except OSError as exc:
+                tried.append((port, str(exc)))
+                continue
+
+    sample = "; ".join([f"{p}:{err}" for p, err in tried[:20]])
+    raise RuntimeError(f"No available ports found (checked {len(tried)} ports). Sample errors: {sample}")
 
 def ensure_mt5():
     if not mt5.initialize():
@@ -130,6 +161,28 @@ async def handle_historical(request):
         print(f"Historical fetch error for {sym}: {e}")
         return web.json_response({'bars': [], 'error': str(e)}, status=500)
 
+async def handle_tick(request):
+    try:
+        ensure_mt5()
+    except Exception as e:
+        print(f"MT5 init error on /tick: {e}")
+        return web.json_response({'error': str(e)}, status=503)
+    sym = request.query.get('symbol')
+    if not sym:
+        return web.json_response({'error': 'missing symbol'}, status=400)
+    try:
+        tick = mt5.symbol_info_tick(sym)
+        if tick is None:
+            return web.json_response({'symbol': sym, 'tick': None})
+        t = int(getattr(tick, 'time', int(time.time())))
+        bid = float(getattr(tick, 'bid', 0.0))
+        ask = float(getattr(tick, 'ask', 0.0))
+        vol = int(getattr(tick, 'volume', 0) or 0)
+        return web.json_response({'symbol': sym, 'bid': bid, 'ask': ask, 'time': t, 'volume': vol})
+    except Exception as e:
+        print(f"/tick error for {sym}: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
 async def ws_handler(ws, path=None):
     clients.add(ws)
     try:
@@ -190,19 +243,31 @@ def main():
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_get('/ping', handle_ping)
     app.router.add_get('/historical', handle_historical)
+    app.router.add_get('/tick', handle_tick)
     runner = web.AppRunner(app)
 
     async def start_servers():
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', HTTP_PORT)
-        await site.start()
-        # Run WS on HTTP_PORT+1 to avoid attempting to bind the same port twice
-        ws_port = HTTP_PORT + 1
-        ws_server = await websockets.serve(ws_handler, '0.0.0.0', ws_port, ping_interval=None)
-        asyncio.create_task(ticker_loop())
-        print(f"MT5 bridge running HTTP on port {HTTP_PORT} and WS on port {ws_port}")
-        while True:
-            await asyncio.sleep(3600)
+        try:
+            # Find first available port
+            http_port = find_free_port(HTTP_PORT)
+            ws_port = find_free_port(http_port + 1)
+            
+            await runner.setup()
+            site = web.TCPSite(runner, '127.0.0.1', http_port)
+            await site.start()
+            
+            ws_server = await websockets.serve(ws_handler, '127.0.0.1', ws_port, ping_interval=None)
+            asyncio.create_task(ticker_loop())
+            
+            print(f"\n✓ MT5 bridge started successfully!")
+            print(f"  HTTP: http://127.0.0.1:{http_port}")
+            print(f"  WS: ws://127.0.0.1:{ws_port}\n")
+            
+            while True:
+                await asyncio.sleep(3600)
+        except Exception as e:
+            print(f"\n✗ Error starting server: {e}\n")
+            raise
 
     asyncio.run(start_servers())
 

@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Lock,
   Unlock
+  , ChevronRight
 } from 'lucide-react';
 import { OHLCData, VolumeData, ChartSettings, Drawing } from '../types';
 import { calculateRSI } from '../indicator/RSI';
@@ -36,11 +37,13 @@ import { ToolType } from '../icons/toolTypes';
 import { activateTool, deactivateTool } from '../drawing/toolManager';
 import { safeSetSeriesData, timeToValue, coordinateToTimeEx, snapPointToOHLC } from '../drawing/trendline';
 import { PairIcons } from '../utils/symbolIcons';
+import { priceDecimalsFor, priceStepFor } from '../utils/formatPrice';
 import { ChartStyle } from '../App';
 import RectangleSettingsModal from './RectangleSettingsModal';
 
 export interface TradingChartHandle {
   takeScreenshot: () => string | undefined;
+  jumpToLive?: () => void;
 }
 
 interface TradingChartProps {
@@ -131,6 +134,45 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const [hoverFormattedTime, setHoverFormattedTime] = useState<string>('');
 
   const [textInputState, setTextInputState] = useState<{ id: string, x: number, y: number, value: string } | null>(null);
+  const [showJumpButton, setShowJumpButton] = useState(false);
+
+  const jumpToLive = useCallback(() => {
+    if (!chartRef.current) return;
+    try {
+      (chartRef.current as any).timeScale().scrollToRealTime();
+    } catch (err) {
+      // ignore
+    }
+  }, []);
+
+  // show the jump-to-live button only when the visible range does not include the latest bar
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const ts = (chartRef.current as any).timeScale();
+    if (!ts || !data || data.length === 0) {
+      setShowJumpButton(false);
+      return;
+    }
+
+    const checkVisible = () => {
+      try {
+        const vr = ts.getVisibleRange();
+        if (!vr) return setShowJumpButton(false);
+        const lastTime = data[data.length - 1].time;
+        // if the right edge of visible range is strictly less than last bar time, show button
+        const atLive = (vr.to >= (lastTime as any));
+        setShowJumpButton(!atLive);
+      } catch (e) {
+        setShowJumpButton(false);
+      }
+    };
+
+    checkVisible();
+    const unsub = ts.subscribeVisibleTimeRangeChange(checkVisible);
+    return () => {
+      try { unsub(); } catch (e) { }
+    };
+  }, [chartRef.current, data]);
   const [showRectangleColorsId, setShowRectangleColorsId] = useState<string | null>(null);
 
   // Context Menu State
@@ -140,6 +182,13 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     takeScreenshot: () => {
       if (!chartRef.current) return undefined;
       return chartRef.current.takeScreenshot().toDataURL('image/png');
+    },
+    jumpToLive: () => {
+      try {
+        (chartRef.current as any)?.timeScale().scrollToRealTime();
+      } catch (e) {
+        // ignore
+      }
     }
   }));
 
@@ -247,6 +296,12 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           top: canvas.marginTop / 100,
           bottom: canvas.marginBottom / 100,
         },
+        tickMarkFormatter: (price: number) => {
+          const decimals = priceDecimalsFor(symbol);
+          return price.toFixed(decimals);
+        },
+        labelVisible: true,
+        drawTicks: true,
       },
       leftPriceScale: {
         visible: scales.placement === 'Left',
@@ -255,6 +310,10 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
         scaleMargins: {
           top: canvas.marginTop / 100,
           bottom: canvas.marginBottom / 100,
+        },
+        tickMarkFormatter: (price: number) => {
+          const decimals = priceDecimalsFor(symbol);
+          return price.toFixed(decimals);
         },
       },
       timeScale: {
@@ -266,7 +325,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
         style: canvas.crosshairStyle as any,
       }
     });
-  }, [isReady, chartSettings]);
+  }, [isReady, chartSettings, symbol]);
 
   // DRAWING TOOL ACTIVATION
   useEffect(() => {
@@ -327,10 +386,20 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
       height: chartContainerRef.current.clientHeight,
     });
     chartRef.current = chart;
+    // Give extra right offset so price labels have room and ensure right scale labels are visible
+    try {
+      chart.timeScale().applyOptions({ rightOffset: 60 });
+      chart.applyOptions({ rightPriceScale: { labelVisible: true, drawTicks: true } });
+    } catch (e) {
+      // ignore if API differs
+    }
+    console.log('[TradingChart] init', { symbol, showVolume: props.showVolume, dataLength: data.length });
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => setViewportCounter(v => v + 1));
     chart.subscribeCrosshairMove((param) => {
+      console.log('[TradingChart] crosshair move - param.time:', param.time, 'data length:', data.length);
       if (param.time) {
         const d = data.find(item => item.time === param.time);
+        console.log('[TradingChart] found OHLC:', d);
         if (d) setDisplayOHLC(d);
       }
     });
@@ -366,19 +435,24 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     }
 
     const { symbol: symSettings } = chartSettings || { symbol: { borderVisible: true, wickVisible: true, upColor: '#26a69a', downColor: '#ef5350' } };
+    const useRightScale = (chartSettings?.scales?.placement === 'Right' || chartSettings?.scales?.placement === 'Auto');
+    const seriesDecimals = priceDecimalsFor(symbol);
+    const seriesMinMove = priceStepFor(symbol);
 
     switch (style) {
       case 'bars':
-        mainSeriesRef.current = chart.addBarSeries({ upColor: TV_GREEN, downColor: TV_RED });
+        mainSeriesRef.current = chart.addBarSeries({ upColor: TV_GREEN, downColor: TV_RED, priceScaleId: useRightScale ? 'right' : undefined, priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove } });
         break;
       case 'line':
-        mainSeriesRef.current = chart.addLineSeries({ color: TV_ACCENT, lineWidth: 2 });
+        mainSeriesRef.current = chart.addLineSeries({ color: TV_ACCENT, lineWidth: 2, priceScaleId: useRightScale ? 'right' : undefined, priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove } });
         break;
       case 'area':
         mainSeriesRef.current = chart.addAreaSeries({
           lineColor: TV_ACCENT,
           topColor: TV_ACCENT + '44',
-          bottomColor: TV_ACCENT + '00'
+          bottomColor: TV_ACCENT + '00',
+          priceScaleId: useRightScale ? 'right' : undefined,
+          priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove },
         });
         break;
       case 'baseline':
@@ -390,10 +464,12 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           bottomFillColor1: TV_RED + '00',
           bottomFillColor2: TV_RED + '44',
           bottomLineColor: TV_RED,
+          priceScaleId: useRightScale ? 'right' : undefined,
+          priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove },
         });
         break;
       case 'columns':
-        mainSeriesRef.current = chart.addHistogramSeries({ color: TV_ACCENT });
+        mainSeriesRef.current = chart.addHistogramSeries({ color: TV_ACCENT, priceScaleId: useRightScale ? 'right' : undefined, priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove } });
         break;
       case 'hollow_candles':
         mainSeriesRef.current = chart.addCandlestickSeries({
@@ -405,6 +481,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           wickDownColor: symSettings.wickVisible ? TV_RED : 'transparent',
           borderVisible: symSettings.borderVisible,
           wickVisible: symSettings.wickVisible,
+          priceScaleId: useRightScale ? 'right' : undefined,
         });
         break;
       default: // candles
@@ -417,6 +494,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           borderDownColor: symSettings.borderVisible ? TV_RED : 'transparent',
           wickUpColor: symSettings.wickVisible ? TV_GREEN : 'transparent',
           wickDownColor: symSettings.wickVisible ? TV_RED : 'transparent',
+          priceScaleId: useRightScale ? 'right' : undefined,
+          priceFormat: { type: 'price', precision: seriesDecimals, minMove: seriesMinMove },
         });
         break;
     }
@@ -429,9 +508,23 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
 
     safeSetSeriesData(mainSeriesRef.current!, finalData);
 
+    // Ensure priceScale is always configured with proper formatting
+    const rightScale = chart.priceScale('right');
+    if (rightScale) {
+      console.log('[TradingChart] applying rightScale options for symbol:', symbol, 'decimals:', priceDecimalsFor(symbol));
+      rightScale.applyOptions({
+        labelVisible: true,
+        drawTicks: true,
+        tickMarkFormatter: (price: number) => {
+          const decimals = priceDecimalsFor(symbol);
+          return price.toFixed(decimals);
+        },
+      });
+    }
+
     if (rangeBefore) timeScale.setVisibleLogicalRange(rangeBefore);
     else if (!replayCutoffTime && !isReplaySelecting) timeScale.scrollToRealTime();
-  }, [isReady, visibleData, style, TV_GREEN, TV_RED, chartSettings?.symbol]);
+  }, [isReady, visibleData, style, TV_GREEN, TV_RED, chartSettings?.symbol, symbol]);
 
   // SYNC INDICATORS
   useEffect(() => {
@@ -454,9 +547,40 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
           safeSetSeriesData(u, result.upper); safeSetSeriesData(m, result.middle); safeSetSeriesData(l, result.lower);
           indicatorsRef.current[id] = [u, m, l];
         } else if (id === 'vol') {
-          const s = chart.addHistogramSeries({ color: TV_GREEN + '88', priceScaleId: 'volume', visible: isVisible });
-          chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+          console.log('[TradingChart] adding volume series, visible=', isVisible);
+          const s = chart.addHistogramSeries({
+            priceScaleId: 'volume',
+            visible: isVisible,
+            priceFormat: { type: 'volume' as any },
+            lastValueVisible: true,
+            priceLineVisible: false,
+            base: 0,
+          });
+          // Ensure the dedicated volume price scale is visible and labeled
+          const volScale = chart.priceScale('volume');
+          if (volScale) {
+            const formatLarge = (v: number) => {
+              if (Math.abs(v) >= 1_000_000) return (v / 1_000_000).toFixed(2) + 'M';
+              if (Math.abs(v) >= 1_000) return (v / 1_000).toFixed(2) + 'K';
+              return String(v);
+            };
+            volScale.applyOptions({
+              labelVisible: true,
+              visible: true,
+              borderVisible: false,
+              scaleMargins: { top: 0.85, bottom: 0 },
+              tickMarkFormatter: (v: number) => formatLarge(v as number),
+            });
+          }
           safeSetSeriesData(s, result);
+          // Defensive: ensure per-bar color is present when setting data
+          try {
+            const mapped = result.map(r => ({ time: r.time, value: r.value, color: r.color }));
+            s.setData(mapped as any);
+            console.log('[TradingChart] volume sample (last 30):', mapped.slice(-30));
+          } catch (err) {
+            console.warn('[TradingChart] failed to set defensive volume data', err);
+          }
           indicatorsRef.current[id] = s;
         } else {
           const s = chart.addLineSeries({
@@ -1369,6 +1493,15 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
             {showIndicatorLegend ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
+      </div>
+      <div className="absolute top-2 right-2 z-[500] pointer-events-auto">
+        <button
+          onClick={jumpToLive}
+          title="Jump to live"
+          className="w-8 h-8 flex items-center justify-center bg-[#131722] text-gray-300 hover:bg-[#1e222d] hover:text-white rounded transition-colors shadow-sm"
+        >
+          <ChevronRight size={14} />
+        </button>
       </div>
     </div>
   );

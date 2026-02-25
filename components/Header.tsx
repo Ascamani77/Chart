@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Search, 
-  ChevronDown, 
-  BarChart3, 
-  CandlestickChart, 
-  AreaChart, 
+import {
+  Search,
+  ChevronDown,
+  BarChart3,
+  CandlestickChart,
+  AreaChart,
   Camera,
   LineChart,
   Undo2,
@@ -26,6 +26,7 @@ import {
   LayoutGrid,
   Star,
   ChevronUp
+  , ChevronRight
 } from 'lucide-react';
 import { PairIcons } from '../utils/symbolIcons';
 import { ChartStyle } from '../App';
@@ -48,6 +49,7 @@ interface HeaderProps {
   isReplayActive?: boolean;
   isAnalyzing: boolean;
   onToggleFullscreen?: () => void;
+  onJumpToLive?: () => void;
 }
 
 const STYLE_OPTIONS: { id: ChartStyle; label: string; icon: any; shortcut?: string }[] = [
@@ -127,8 +129,8 @@ const TF_CATEGORIES = [
   }
 ];
 
-const Header: React.FC<HeaderProps> = ({ 
-  currentTimeframe, 
+const Header: React.FC<HeaderProps> = ({
+  currentTimeframe,
   onTimeframeChange,
   currentStyle,
   onStyleChange,
@@ -144,13 +146,14 @@ const Header: React.FC<HeaderProps> = ({
   onToggleReplay,
   isReplayActive = false,
   isAnalyzing,
-  onToggleFullscreen
+  onToggleFullscreen,
+  onJumpToLive
 }) => {
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const [isTfDropdownOpen, setIsTfDropdownOpen] = useState(false);
   const [isCameraDropdownOpen, setIsCameraDropdownOpen] = useState(false);
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
-  
+
   const styleDropdownRef = useRef<HTMLDivElement>(null);
   const tfDropdownRef = useRef<HTMLDivElement>(null);
   const cameraDropdownRef = useRef<HTMLDivElement>(null);
@@ -159,8 +162,8 @@ const Header: React.FC<HeaderProps> = ({
   const mainTimeframes = ['5m', '15m', '30m', '1h', '4h', 'D', 'W'];
 
   // Dynamically compute which timeframes to show in the header
-  const visibleTimeframes = mainTimeframes.includes(currentTimeframe) 
-    ? mainTimeframes 
+  const visibleTimeframes = mainTimeframes.includes(currentTimeframe)
+    ? mainTimeframes
     : [...mainTimeframes, currentTimeframe];
 
   const getActiveStyleIcon = () => {
@@ -216,7 +219,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <div className="h-12 border-b-[4px] border-[#333333] bg-[#0c0c0d] flex items-center px-1 select-none shrink-0 z-[1000] relative shadow-md">
       <div className="flex items-center w-full h-full">
-        
+
         {/* User Icon */}
         <div className="flex items-center shrink-0 pr-1">
           <button onClick={onOpenSideMenu} className="w-8 h-8 flex items-center justify-center bg-[#c62828] rounded-full text-white font-bold text-xs ml-1 hover:opacity-90 transition-opacity shadow-lg">
@@ -228,8 +231,8 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Symbol Search */}
         <div className="flex items-center shrink-0 space-x-1">
-          <div 
-            onClick={onOpenSymbolSearch} 
+          <div
+            onClick={onOpenSymbolSearch}
             className="flex items-center h-8 px-2 bg-[#1c1c1c] hover:bg-white/5 rounded cursor-pointer transition-colors border border-[#333333] group"
           >
             <Search size={14} className="text-gray-300 mr-2 group-hover:text-white" />
@@ -244,15 +247,15 @@ const Header: React.FC<HeaderProps> = ({
         {/* Timeframes */}
         <div className="flex items-center shrink-0 space-x-0.5 h-full relative" ref={tfDropdownRef}>
           {visibleTimeframes.map(tf => (
-            <button 
-              key={tf} 
-              onClick={() => onTimeframeChange(tf)} 
+            <button
+              key={tf}
+              onClick={() => onTimeframeChange(tf)}
               className={`text-[13px] px-2 py-1 rounded transition-colors whitespace-nowrap ${currentTimeframe === tf ? 'bg-white/10 text-white font-bold border border-white/5 shadow-sm' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
             >
               {tf}
             </button>
           ))}
-          <button 
+          <button
             onClick={() => setIsTfDropdownOpen(!isTfDropdownOpen)}
             className={`p-1 hover:text-white transition-colors h-8 flex items-center ${isTfDropdownOpen ? 'text-white bg-white/5 rounded' : 'text-gray-400'}`}
           >
@@ -269,7 +272,7 @@ const Header: React.FC<HeaderProps> = ({
                       <ChevronUp size={12} className="text-[#787b86] group-hover:text-white transition-colors" />
                     </div>
                     {cat.items.map(item => (
-                      <div 
+                      <div
                         key={item.value}
                         onClick={() => { onTimeframeChange(item.value); setIsTfDropdownOpen(false); }}
                         className={`flex items-center justify-between px-4 py-[7px] hover:bg-[#2a2e39] cursor-pointer group transition-colors ${currentTimeframe === item.value ? 'bg-[#2a2e39]' : ''}`}
@@ -280,9 +283,9 @@ const Header: React.FC<HeaderProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <Star 
-                            size={14} 
-                            className={`transition-all ${item.favorite || mainTimeframes.includes(item.value) ? 'text-orange-500 fill-orange-500 opacity-100' : 'text-[#787b86] opacity-0 group-hover:opacity-100 hover:text-orange-500'}`} 
+                          <Star
+                            size={14}
+                            className={`transition-all ${item.favorite || mainTimeframes.includes(item.value) ? 'text-orange-500 fill-orange-500 opacity-100' : 'text-[#787b86] opacity-0 group-hover:opacity-100 hover:text-orange-500'}`}
                           />
                           {currentTimeframe === item.value && <Check size={14} className="text-[#2962ff]" strokeWidth={3} />}
                         </div>
@@ -299,7 +302,7 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Chart Style Dropdown */}
         <div className="flex items-center shrink-0 relative" ref={styleDropdownRef}>
-          <div 
+          <div
             className={`flex items-center hover:bg-white/5 rounded transition-colors cursor-pointer h-8 px-1 ${isStyleDropdownOpen ? 'bg-white/5 text-white' : ''}`}
             onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
           >
@@ -312,7 +315,7 @@ const Header: React.FC<HeaderProps> = ({
           {isStyleDropdownOpen && (
             <div className="absolute top-full left-0 mt-1 bg-[#1c1c1c] border border-[#363a45] rounded-md shadow-2xl py-1.5 min-w-[200px] z-[2000] animate-in fade-in slide-in-from-top-1 duration-150">
               {STYLE_OPTIONS.map(opt => (
-                <div 
+                <div
                   key={opt.id}
                   onClick={() => { onStyleChange(opt.id); setIsStyleDropdownOpen(false); }}
                   className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors hover:bg-[#2962ff] group ${currentStyle === opt.id ? 'bg-[#2962ff]' : ''}`}
@@ -333,7 +336,7 @@ const Header: React.FC<HeaderProps> = ({
               ))}
             </div>
           )}
-          
+
           <button onClick={onOpenIndicators} className="flex items-center space-x-1 px-2 py-1 hover:bg-white/5 rounded text-white ml-1 transition-colors group">
             <LineChart size={22} className="text-gray-300 group-hover:text-white" />
             <span className="text-[13px] font-medium hidden md:inline group-hover:text-white">Indicators</span>
@@ -344,13 +347,12 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Replay Section */}
         <div className="flex items-center shrink-0 px-1">
-          <button 
+          <button
             onClick={onToggleReplay}
-            className={`flex items-center space-x-1.5 px-3 py-1 rounded transition-colors group ${
-              isReplayActive 
-                ? 'bg-[#2962ff] text-white font-bold' 
+            className={`flex items-center space-x-1.5 px-3 py-1 rounded transition-colors group ${isReplayActive
+                ? 'bg-[#2962ff] text-white font-bold'
                 : 'hover:bg-white/5 text-gray-300'
-            }`}
+              }`}
           >
             <ChevronsLeft size={16} strokeWidth={2.5} className={`${isReplayActive ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
             <span className={`text-[13px] font-bold ${isReplayActive ? 'text-white' : 'group-hover:text-white'}`}>Replay</span>
@@ -373,10 +375,10 @@ const Header: React.FC<HeaderProps> = ({
 
         {/* Right Section Icons */}
         <div className="flex items-center shrink-0 space-x-0.5 pr-2">
-          
+
           {/* Unnamed / Layout Dropdown */}
           <div className="relative" ref={layoutDropdownRef}>
-            <div 
+            <div
               onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
               className={`flex items-center px-2 py-1 hover:bg-white/5 rounded cursor-pointer group transition-colors mr-1 ${isLayoutDropdownOpen ? 'bg-white/5' : ''}`}
             >
@@ -419,24 +421,24 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                         {num === 4 && (
                           <>
-                             <LayoutOption><div className="w-1/2 border-r border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div></div><div className="w-1/2 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div></div></LayoutOption>
-                             <LayoutOption className="flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></LayoutOption>
-                             <LayoutOption><div className="w-1/4 border-r border-[#50535e]"></div><div className="w-1/4 border-r border-[#50535e]"></div><div className="w-1/4 border-r border-[#50535e]"></div></LayoutOption>
-                             <LayoutOption><div className="w-1/2 border-r border-[#50535e]"></div><div className="flex-1 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div></LayoutOption>
-                             <LayoutOption><div className="flex-1 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div><div className="w-1/2 border-l border-[#50535e]"></div></LayoutOption>
-                             <LayoutOption className="flex-col"><div className="h-1/2 border-b border-[#50535e]"></div><div className="flex-1 flex"><div className="flex-1 border-r border-[#50535e]"></div><div className="flex-1 border-r border-[#50535e]"></div></div></LayoutOption>
-                             <LayoutOption className="flex-col"><div className="flex-1 flex"><div className="flex-1 border-r border-[#50535e]"></div><div className="flex-1 border-r border-[#50535e]"></div></div><div className="h-1/2 border-t border-[#50535e]"></div></LayoutOption>
-                             <LayoutOption><div className="w-1/3 border-r border-[#50535e]"></div><div className="w-1/3 border-r border-[#50535e]"></div><div className="flex-1"></div></LayoutOption>
-                             <LayoutOption><div className="w-1/2 border-r border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div><div className="flex-1"></div></LayoutOption>
-                             <LayoutOption><div className="flex-1"></div><div className="w-1/2 border-l border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div></LayoutOption>
+                            <LayoutOption><div className="w-1/2 border-r border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div></div><div className="w-1/2 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div></div></LayoutOption>
+                            <LayoutOption className="flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></LayoutOption>
+                            <LayoutOption><div className="w-1/4 border-r border-[#50535e]"></div><div className="w-1/4 border-r border-[#50535e]"></div><div className="w-1/4 border-r border-[#50535e]"></div></LayoutOption>
+                            <LayoutOption><div className="w-1/2 border-r border-[#50535e]"></div><div className="flex-1 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div></LayoutOption>
+                            <LayoutOption><div className="flex-1 flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div><div className="w-1/2 border-l border-[#50535e]"></div></LayoutOption>
+                            <LayoutOption className="flex-col"><div className="h-1/2 border-b border-[#50535e]"></div><div className="flex-1 flex"><div className="flex-1 border-r border-[#50535e]"></div><div className="flex-1 border-r border-[#50535e]"></div></div></LayoutOption>
+                            <LayoutOption className="flex-col"><div className="flex-1 flex"><div className="flex-1 border-r border-[#50535e]"></div><div className="flex-1 border-r border-[#50535e]"></div></div><div className="h-1/2 border-t border-[#50535e]"></div></LayoutOption>
+                            <LayoutOption><div className="w-1/3 border-r border-[#50535e]"></div><div className="w-1/3 border-r border-[#50535e]"></div><div className="flex-1"></div></LayoutOption>
+                            <LayoutOption><div className="w-1/2 border-r border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div><div className="flex-1"></div></LayoutOption>
+                            <LayoutOption><div className="flex-1"></div><div className="w-1/2 border-l border-[#50535e] flex flex-col"><div className="flex-1 border-b border-[#50535e]"></div><div className="flex-1"></div></div></LayoutOption>
                           </>
                         )}
                         {num > 4 && (
                           <LayoutOption>
                             <div className="w-full h-full flex flex-wrap">
-                               {Array.from({ length: num }).map((_, i) => (
-                                 <div key={i} className="border-r border-b border-[#50535e]" style={{ width: `${100 / Math.ceil(Math.sqrt(num))}%`, height: `${100 / Math.ceil(num / Math.ceil(Math.sqrt(num)))}%` }}></div>
-                               ))}
+                              {Array.from({ length: num }).map((_, i) => (
+                                <div key={i} className="border-r border-b border-[#50535e]" style={{ width: `${100 / Math.ceil(Math.sqrt(num))}%`, height: `${100 / Math.ceil(num / Math.ceil(Math.sqrt(num)))}%` }}></div>
+                              ))}
                             </div>
                           </LayoutOption>
                         )}
@@ -446,42 +448,51 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="bg-[#1c1c1c] py-3 border-t border-[#2a2e39]">
-                   <div className="px-4 mb-2">
-                      <span className="text-[11px] font-bold text-[#787b86] uppercase tracking-wider">SYNC IN LAYOUT</span>
-                   </div>
-                   <SyncRow label="Symbol" active />
-                   <SyncRow label="Interval" />
-                   <SyncRow label="Crosshair" active />
-                   <SyncRow label="Time" />
-                   <SyncRow label="Date range" />
+                  <div className="px-4 mb-2">
+                    <span className="text-[11px] font-bold text-[#787b86] uppercase tracking-wider">SYNC IN LAYOUT</span>
+                  </div>
+                  <SyncRow label="Symbol" active />
+                  <SyncRow label="Interval" />
+                  <SyncRow label="Crosshair" active />
+                  <SyncRow label="Time" />
+                  <SyncRow label="Date range" />
                 </div>
               </div>
             )}
           </div>
 
+          {/* Jump-to-live button next to layout */}
+          <button
+            onClick={() => onJumpToLive && onJumpToLive()}
+            className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded transition-colors mr-1"
+            title="Jump to live"
+          >
+            <ChevronRight size={16} />
+          </button>
+
           <div className="h-6 w-px bg-[#2a2e39] mx-1 shrink-0"></div>
 
-          <button 
+          <button
             onClick={onOpenToolSearch}
             className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded relative transition-colors group"
           >
             <Search size={20} />
             <Zap size={10} className="absolute top-1 right-1 text-gray-400 fill-gray-400 group-hover:text-white group-hover:fill-white" />
           </button>
-          
+
           <button onClick={onOpenSettings} className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded transition-colors">
             <Hexagon size={20} />
           </button>
-          
-          <button 
+
+          <button
             onClick={onToggleFullscreen}
             className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded transition-colors hidden sm:block"
           >
             <Scan size={18} />
           </button>
-          
+
           <div className="relative" ref={cameraDropdownRef}>
-            <button 
+            <button
               onClick={() => setIsCameraDropdownOpen(!isCameraDropdownOpen)}
               className={`p-2 hover:text-white hover:bg-white/5 rounded transition-colors hidden sm:block ${isCameraDropdownOpen ? 'text-white bg-white/5' : 'text-gray-400'}`}
             >
@@ -490,7 +501,7 @@ const Header: React.FC<HeaderProps> = ({
 
             {isCameraDropdownOpen && (
               <div className="absolute top-full right-0 mt-1 bg-[#1c1c1c] border border-[#363a45] rounded-md shadow-2xl py-1.5 min-w-[240px] z-[2000] animate-in fade-in slide-in-from-top-1 duration-150">
-                <div 
+                <div
                   className="flex items-center space-x-3 px-3 py-2 cursor-pointer transition-colors hover:bg-[#2962ff] group text-gray-300 hover:text-white"
                   onClick={() => {
                     onDownloadChart();
@@ -503,7 +514,7 @@ const Header: React.FC<HeaderProps> = ({
                     <span className="text-[10px] opacity-60">Alt+S</span>
                   </div>
                 </div>
-                <div 
+                <div
                   className="flex items-center space-x-3 px-3 py-2 cursor-pointer transition-colors hover:bg-[#2962ff] group text-gray-300 hover:text-white"
                   onClick={() => {
                     onTriggerAI();
@@ -519,7 +530,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center ml-2">
             <button className="px-5 py-1.5 bg-[#131722] text-white text-[13px] font-bold rounded-full border border-[#363a45] hover:bg-[#1e222d] transition-all shadow-lg active:scale-95">
               Trade

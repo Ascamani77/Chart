@@ -9,39 +9,44 @@ interface SymbolItem {
   exchange: string;
   type: string;
   category: string;
+  price?: number;
 }
 
 const SYMBOLS: SymbolItem[] = [
-  // WATCHLIST SECTION
-  { ticker: 'SPX', name: 'S&P 500 Index', exchange: 'SPCFD', type: 'index', category: 'Watchlist' },
-  { ticker: 'NDQ', name: 'US 100 Index', exchange: 'TVC', type: 'index', category: 'Watchlist' },
-  { ticker: 'DJI', name: 'Dow Jones Industrial Average Index', exchange: 'TVC', type: 'index', category: 'Watchlist' },
-  { ticker: 'DXY', name: 'U.S. Dollar Index', exchange: 'TVC', type: 'index', category: 'Watchlist' },
-  { ticker: 'BTCUSDT', name: 'Bitcoin / TetherUS', exchange: 'BINANCE', type: 'crypto', category: 'Watchlist' },
-  { ticker: 'ETHUSDT', name: 'Ethereum / TetherUS', exchange: 'BINANCE', type: 'crypto', category: 'Watchlist' },
-  { ticker: 'SOLUSDT', name: 'Solana / TetherUS', exchange: 'BINANCE', type: 'crypto', category: 'Watchlist' },
-  
-  // FOREX SECTION
-  { ticker: 'EURUSD', name: 'Euro / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'GBPUSD', name: 'British Pound / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'USDJPY', name: 'U.S. Dollar / Japanese Yen', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'AUDUSD', name: 'Australian Dollar / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'USDCAD', name: 'U.S. Dollar / Canadian Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'USDCHF', name: 'U.S. Dollar / Swiss Franc', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
-  { ticker: 'NZDUSD', name: 'New Zealand Dollar / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX' },
+  // FOREX (5)
+  { ticker: 'EURUSD', name: 'Euro / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX', price: 1.0845 },
+  { ticker: 'GBPUSD', name: 'British Pound / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX', price: 1.2634 },
+  { ticker: 'USDJPY', name: 'U.S. Dollar / Japanese Yen', exchange: 'FXCM', type: 'forex', category: 'FOREX', price: 151.42 },
+  { ticker: 'USDCHF', name: 'U.S. Dollar / Swiss Franc', exchange: 'FXCM', type: 'forex', category: 'FOREX', price: 0.8812 },
+  { ticker: 'AUDUSD', name: 'Australian Dollar / U.S. Dollar', exchange: 'FXCM', type: 'forex', category: 'FOREX', price: 0.6542 },
 
-  // STOCKS SECTION
-  { ticker: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  { ticker: 'TSLA', name: 'Tesla, Inc.', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  { ticker: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  { ticker: 'NFLX', name: 'Netflix, Inc.', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  { ticker: 'AMZN', name: 'Amazon.com, Inc.', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS' },
-  
-  // FUTURES SECTION
-  { ticker: 'XAUUSD', name: 'Gold / U.S. Dollar', exchange: 'TVC', type: 'commodity', category: 'FUTURES' },
-  { ticker: 'XAGUSD', name: 'Silver / U.S. Dollar', exchange: 'TVC', type: 'commodity', category: 'FUTURES' },
-  { ticker: 'USOIL', name: 'CFDs on WTI Crude Oil', exchange: 'TVC', type: 'commodity', category: 'FUTURES' },
+  // STOCKS (5)
+  { ticker: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS', price: 890.15 },
+  { ticker: 'TSLA', name: 'Tesla, Inc.', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS', price: 172.40 },
+  { ticker: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS', price: 185.12 },
+  { ticker: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS', price: 425.40 },
+  { ticker: 'AMZN', name: 'Amazon.com, Inc.', exchange: 'NASDAQ', type: 'stock', category: 'STOCKS', price: 180.15 },
+
+  // COMMODITIES (4)
+  { ticker: 'XAUUSD', name: 'Gold / U.S. Dollar', exchange: 'TVC', type: 'commodity', category: 'COMMODITIES', price: 2342.50 },
+  { ticker: 'XAGUSD', name: 'Silver / U.S. Dollar', exchange: 'TVC', type: 'commodity', category: 'COMMODITIES', price: 28.45 },
+  { ticker: 'USOIL', name: 'Crude Oil (WTI)', exchange: 'TVC', type: 'commodity', category: 'COMMODITIES', price: 82.14 },
+  { ticker: 'DXY', name: 'U.S. Dollar Index', exchange: 'TVC', type: 'index', category: 'COMMODITIES', price: 104.28 },
+
+  // CRYPTO (4)
+  { ticker: 'BTCUSDT', name: 'Bitcoin / TetherUS (Binance)', exchange: 'BINANCE', type: 'crypto', category: 'CRYPTO', price: 67432.50 },
+  { ticker: 'ETHUSDT', name: 'Ethereum / TetherUS (Binance)', exchange: 'BINANCE', type: 'crypto', category: 'CRYPTO', price: 3452.15 },
+  { ticker: 'BTCUSD', name: 'Bitcoin / USD (Broker)', exchange: 'METAS', type: 'crypto', category: 'CRYPTO', price: 67425.00 },
+  { ticker: 'ETHUSD', name: 'Ethereum / USD (Broker)', exchange: 'METAS', type: 'crypto', category: 'CRYPTO', price: 3450.80 },
+
+  // INDICES (3)
+  { ticker: 'NAS100', name: 'Nasdaq 100 Index', exchange: 'TVC', type: 'index', category: 'INDICES', price: 18240.50 },
+  { ticker: 'US30', name: 'Dow Jones Industrial Average', exchange: 'TVC', type: 'index', category: 'INDICES', price: 39120.00 },
+  { ticker: 'SPX500', name: 'S&P 500 Index', exchange: 'TVC', type: 'index', category: 'INDICES', price: 5210.45 },
+
+  // BONDS (2)
+  { ticker: 'US10Y', name: '10-Year Treasury Bond', exchange: 'TVC', type: 'bond', category: 'BONDS', price: 4.256 },
+  { ticker: 'US02Y', name: '2-Year Treasury Bond', exchange: 'TVC', type: 'bond', category: 'BONDS', price: 4.624 },
 ];
 
 interface SymbolSearchModalProps {
@@ -51,13 +56,16 @@ interface SymbolSearchModalProps {
 
 const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({ onClose, onSelect }) => {
   const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const filtered = SYMBOLS.filter(s => 
-    s.ticker.toLowerCase().includes(query.toLowerCase()) || 
-    s.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = SYMBOLS.filter(s => {
+    const matchesQuery = s.ticker.toLowerCase().includes(query.toLowerCase()) ||
+      s.name.toLowerCase().includes(query.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || s.category === selectedCategory;
+    return matchesQuery && matchesCategory;
+  });
 
-  const categories = ['Watchlist', 'FOREX', 'STOCKS', 'FUTURES'];
+  const categories = ['FOREX', 'STOCKS', 'COMMODITIES', 'CRYPTO', 'INDICES', 'BONDS'];
 
   return (
     <div className="fixed inset-0 z-[2500] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -74,7 +82,7 @@ const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({ onClose, onSelect
         <div className="p-4 border-b border-[#2a2e39] bg-[#1e1e1e]">
           <div className="relative flex items-center">
             <Search className="absolute left-3 text-gray-500" size={18} />
-            <input 
+            <input
               autoFocus
               type="text"
               placeholder="Symbol, ISIN, or CUSIP"
@@ -83,13 +91,14 @@ const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({ onClose, onSelect
               className="w-full bg-[#2d2d2d] border border-[#2a2e39] focus:border-gray-400 rounded-lg py-2.5 pl-10 pr-4 text-sm text-gray-200 outline-none transition-all placeholder-gray-500 font-medium"
             />
           </div>
-          
+
           {/* Category Filters */}
           <div className="mt-4 flex space-x-2 overflow-x-auto scrollbar-hide pb-1">
-            {['All', 'Stocks', 'Funds', 'Futures', 'Forex', 'Crypto', 'Indices'].map(cat => (
-              <button 
+            {['All', ...categories].map(cat => (
+              <button
                 key={cat}
-                className={`px-4 py-1 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${cat === 'All' ? 'bg-white/10 text-white border-white/20' : 'text-gray-400 border-[#363a45] hover:bg-white/5 hover:text-white'}`}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-1 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap ${selectedCategory === cat ? 'bg-white text-black border-white' : 'text-gray-400 border-[#363a45] hover:bg-white/5 hover:text-white'}`}
               >
                 {cat}
               </button>
@@ -102,14 +111,14 @@ const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({ onClose, onSelect
           {categories.map(cat => {
             const items = filtered.filter(i => i.category === cat);
             if (items.length === 0) return null;
-            
+
             return (
               <div key={cat} className="mb-2">
                 <div className="px-4 py-1.5 text-[9px] font-bold text-gray-500 uppercase tracking-wider bg-[#262626] sticky top-0 z-10">
                   {cat}
                 </div>
                 {items.map((item) => (
-                  <div 
+                  <div
                     key={item.ticker}
                     onClick={() => { onSelect(item.ticker); onClose(); }}
                     className="flex items-center justify-between px-4 py-2 hover:bg-white/5 cursor-pointer border-b border-[#2a2e39] transition-colors"
@@ -136,9 +145,9 @@ const SymbolSearchModal: React.FC<SymbolSearchModalProps> = ({ onClose, onSelect
         {/* Footer Navigation */}
         <div className="h-10 border-t border-[#2a2e39] flex items-center justify-center px-4 shrink-0 bg-[#1e1e1e]">
           <div className="flex space-x-8">
-              <div className="w-6 h-0.5 bg-[#2962ff] rounded-full"></div>
-              <div className="w-6 h-0.5 bg-[#2d2d2d] rounded-full"></div>
-              <div className="w-6 h-0.5 bg-[#2d2d2d] rounded-full"></div>
+            <div className="w-6 h-0.5 bg-[#2962ff] rounded-full"></div>
+            <div className="w-6 h-0.5 bg-[#2d2d2d] rounded-full"></div>
+            <div className="w-6 h-0.5 bg-[#2d2d2d] rounded-full"></div>
           </div>
         </div>
       </div>

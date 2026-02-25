@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { WATCHLIST_DATA } from '../utils/mockData';
+import { formatPrice } from '../utils/formatPrice';
 
 const WatchlistTable: React.FC = () => {
   return (
@@ -23,7 +24,7 @@ const WatchlistTable: React.FC = () => {
             </td>
             <td className="text-right py-2 px-0.5">
               <span className="text-[11px] font-bold text-white tabular-nums">
-                {item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatPrice(item.price, item.ticker)}
               </span>
             </td>
             <td className="text-right py-2 px-1">

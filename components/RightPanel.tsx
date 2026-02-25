@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { 
-  Plus, 
-  ListFilter, 
-  ChevronDown, 
-  Activity, 
+import {
+  Plus,
+  ListFilter,
+  ChevronDown,
+  Activity,
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
@@ -60,10 +60,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ analysisContent, isAnalyzing, o
             <div className="flex-1 overflow-y-auto scrollbar-hide bg-[#0c0c0d]">
               <WatchlistTable />
             </div>
-            <AISentiment 
-              analysisContent={analysisContent} 
-              isAnalyzing={isAnalyzing} 
-              onRefreshAnalysis={onRefreshAnalysis} 
+            <AISentiment
+              analysisContent={analysisContent}
+              isAnalyzing={isAnalyzing}
+              onRefreshAnalysis={onRefreshAnalysis}
             />
           </div>
         );
@@ -102,10 +102,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ analysisContent, isAnalyzing, o
   return (
     <div className="relative flex h-full shrink-0">
       {/* Content Area (Overlay Drawer) */}
-      <div 
+      <div
         className={`absolute top-0 right-[56px] h-full flex flex-col overflow-hidden bg-[#0c0c0d] border-l-[4px] border-[#333333] z-[70] shadow-[-10px_0_30px_rgba(0,0,0,0.5)] transition-all duration-300 ease-in-out
           ${isExpanded && isStripVisible
-            ? 'translate-x-0 opacity-100 lg:w-[260px] md:w-[320px] w-[calc(100vw-56px)]' 
+            ? 'translate-x-0 opacity-100 lg:w-[260px] md:w-[320px] w-[calc(100vw-56px)]'
             : 'translate-x-full opacity-0 w-0 pointer-events-none'
           }`}
       >
@@ -120,8 +120,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ analysisContent, isAnalyzing, o
           <div className="flex items-center space-x-2 text-gray-400">
             <Plus size={16} className="cursor-pointer hover:text-white transition-colors" />
             <ListFilter size={16} className="cursor-pointer hover:text-white transition-colors" />
-            <button 
-              onClick={() => setIsExpanded(false)} 
+            <button
+              onClick={() => setIsExpanded(false)}
               className="hover:text-white transition-colors p-1"
               aria-label="Close panel"
             >
@@ -137,27 +137,27 @@ const RightPanel: React.FC<RightPanelProps> = ({ analysisContent, isAnalyzing, o
 
       {/* Restore Sidebar Handle (Visible when completely hidden) */}
       {!isStripVisible && (
-        <button 
+        <button
           onClick={() => setIsStripVisible(true)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-[80] w-6 h-16 bg-[#131722] border border-[#333333] border-r-0 rounded-l-md flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#1e222d] shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all active:scale-95 group"
+          className="absolute right-0 bottom-6 z-[80] w-6 h-10 bg-[#131722] border border-[#333333] border-r-0 rounded-l-md flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#1e222d] shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all active:scale-95 group"
           title="Show Sidebar"
         >
-          <ChevronLeft size={20} className="group-hover:translate-x-[-1px] transition-transform" />
+          <ChevronLeft size={14} className="group-hover:translate-x-[-1px] transition-transform" />
         </button>
       )}
 
       {/* Far Right Vertical Utility Strip (56px) */}
       <div className={`relative transition-all duration-300 h-full flex flex-col ${isStripVisible ? 'w-[56px]' : 'w-0 overflow-hidden opacity-0'}`}>
-        <UtilityStrip 
-          activeUtility={activeUtility} 
-          isExpanded={isExpanded} 
+        <UtilityStrip
+          activeUtility={activeUtility}
+          isExpanded={isExpanded}
           onUtilityClick={handleUtilityClick}
           onToggleExpand={handleToggleStrip}
         />
-        
+
         {/* Mobile-only internal collapse button at bottom of strip */}
         <div className="absolute bottom-16 right-0 w-full flex justify-center lg:hidden">
-          <button 
+          <button
             onClick={() => setIsStripVisible(false)}
             className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-white transition-colors bg-white/5 rounded-full"
             title="Collapse Sidebar"

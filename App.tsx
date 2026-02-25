@@ -18,6 +18,7 @@ import SettingsModal from './components/SettingsModal';
 import ReplayToolbar from './components/ReplayToolbar';
 import { generateMockOHLC, generateVolumeData } from './utils/mockData';
 import mt5Service from './mt5Service';
+import { getBondHistoricalData, isBondSymbol } from './fredService';
 import { getMarketAnalysis } from './services/geminiService';
 import { ToolType } from './icons/toolTypes';
 import { ChartSettings, Drawing } from './types';
@@ -225,8 +226,9 @@ const App: React.FC = () => {
   const [atrPeriod, setAtrPeriod] = useState(() => Number(localStorage.getItem('atrPeriod')) || 14);
 
   const [showVolume, setShowVolume] = useState(() => {
-    const saved = localStorage.getItem('showVolume');
-    return saved === null ? true : saved === 'true';
+    // Always start with volume hidden by default, reset any old localStorage value
+    localStorage.setItem('showVolume', 'false');
+    return false;
   });
 
   // Persistence Sync Effects
@@ -271,11 +273,12 @@ const App: React.FC = () => {
   const replayManager = useRef<ReplayManager>(new ReplayManager(setReplayState));
 
   const chartDataConfig = useMemo(() => {
+    // Use up to 5000 candles across timeframes; keep interval for mock generation
     const tf = timeframe.toLowerCase();
-    if (tf.includes('m')) return { count: 300, interval: 'm' as const };
-    if (tf.includes('h')) return { count: 200, interval: 'h' as const };
-    if (tf.includes('w')) return { count: 260, interval: 'w' as const };
-    return { count: 365, interval: 'd' as const };
+    if (tf.includes('m')) return { count: 5000, interval: 'm' as const };
+    if (tf.includes('h')) return { count: 5000, interval: 'h' as const };
+    if (tf.includes('w')) return { count: 5000, interval: 'w' as const };
+    return { count: 5000, interval: 'd' as const };
   }, [timeframe]);
 
   // fullChartData is populated from MT5 bridge — fall back to deterministic mock while loading
@@ -296,20 +299,81 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        // probe for a broker symbol variant that actually has historical data
-        const brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
-        console.log(`MT5: using broker symbol '${brokerSymbol}' for UI symbol '${activeSymbol}'`);
+        let hist = [];
 
-        const hist = await mt5Service.getHistoricalData(brokerSymbol, timeframe, cfgCount);
-        console.log(`MT5: historical bars for ${brokerSymbol} (UI ${activeSymbol}) count=`, (hist && hist.length) ? hist.length : 0);
+        // Check if this is a bond symbol that uses FRED API
+        if (isBondSymbol(activeSymbol)) {
+          console.log(`[FRED] fetching bond data for ${activeSymbol}`);
+          hist = await getBondHistoricalData(activeSymbol, cfgCount);
+          console.log(`[FRED] historical bars for ${activeSymbol} count=`, (hist && hist.length) ? hist.length : 0);
+        } else {
+          // Otherwise use MT5 bridge
+          const brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
+          console.log(`MT5: using broker symbol '${brokerSymbol}' for UI symbol '${activeSymbol}'`);
+          hist = await mt5Service.getHistoricalData(brokerSymbol, timeframe, cfgCount, activeSymbol);
+          console.log(`MT5: historical bars for ${brokerSymbol} (UI ${activeSymbol}) count=`, (hist && hist.length) ? hist.length : 0);
+        }
+
         if (hist && hist.length > 0) {
           if (!mounted) return;
-          setFullChartData(hist.slice(-cfgCount));
+          // Ensure the chart starts with the current forming candle aligned
+          // to the timeframe interval so switching pairs is immediate.
+          const trimmed = hist.slice(-cfgCount);
+          // attempt to use latest live tick for forming candle when available
+          let latestTick: any = null;
+          try {
+            // brokerSymbol may be available from MT5 path; try resolving if needed
+            let brokerSymbol: string | null = null;
+            if (!isBondSymbol(activeSymbol)) {
+              brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
+              latestTick = await mt5Service.getLatestTick(brokerSymbol);
+            }
+          } catch (e) {
+            latestTick = null;
+          }
+          // compute interval seconds from timeframe
+          const tf = (timeframe || '1m').toString();
+          let intervalSec = 60;
+          const mm = tf.match(/^(\d+)([mhdw])$/i);
+          if (mm) {
+            const n = Number(mm[1]);
+            const unit = mm[2].toLowerCase();
+            if (unit === 'm') intervalSec = n * 60;
+            else if (unit === 'h') intervalSec = n * 3600;
+            else if (unit === 'd') intervalSec = n * 86400;
+            else if (unit === 'w') intervalSec = n * 604800;
+          } else {
+            if (/^d$/i.test(tf)) intervalSec = 86400;
+            else if (/^w$/i.test(tf)) intervalSec = 604800;
+            else intervalSec = 60;
+          }
+
+          const nowSec = Math.floor(Date.now() / 1000);
+          const currentBucket = Math.floor(nowSec / intervalSec) * intervalSec;
+          const last = trimmed[trimmed.length - 1];
+          if (!last || last.time < currentBucket) {
+            // create a forming candle starting exactly at currentBucket
+            const fallbackOpen = last ? Number(last.close) : 0;
+            const openPrice = (latestTick && typeof latestTick.bid === 'number') ? Number(latestTick.bid) : fallbackOpen;
+            const forming = { time: currentBucket, open: openPrice, high: openPrice, low: openPrice, close: openPrice, volume: Number((latestTick && latestTick.volume) || 0) } as any;
+            // if trimmed is empty, start with forming only; otherwise append
+            const newData = trimmed.length ? trimmed.concat(forming).slice(-cfgCount) : [forming];
+            setFullChartData(newData);
+          } else {
+            setFullChartData(trimmed);
+          }
         } else {
-          console.log('MT5: no historical bars found for any candidate, keeping mock data');
+          console.log('No historical bars found, keeping mock data');
+        }
+
+        // Skip live ticks for bond symbols (FRED only provides daily data)
+        if (isBondSymbol(activeSymbol)) {
+          console.log(`[FRED] Bonds do not have real-time ticks, skipping subscription`);
+          return;
         }
 
         // subscribe to ticks using the discovered broker symbol
+        const brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
         unsub = mt5Service.subscribeToTicks(brokerSymbol, (tick: any) => {
           setFullChartData(prev => {
             const tickTime = Math.floor((tick.time || Date.now() / 1000));
@@ -361,7 +425,7 @@ const App: React.FC = () => {
               return next;
             }
           });
-        });
+        }, activeSymbol);
       } catch (e) {
         console.error('MT5 historical fetch failed', e);
       }
@@ -515,6 +579,20 @@ const App: React.FC = () => {
     setIsAlertModalOpen(false);
   }, []);
 
+  const handleSymbolSelect = useCallback((symbol: string) => {
+    setActiveSymbol(symbol);
+    // When selecting a bond, force daily timeframe since FRED only has daily data
+    // and hide volume since FRED doesn't provide volume data
+    if (isBondSymbol(symbol)) {
+      setTimeframe('D');
+      setShowVolume(false);
+      console.log(`[Bond] Switching to daily timeframe and hiding volume for ${symbol}`);
+    } else {
+      // Restore volume visibility for non-bond symbols
+      setShowVolume(true);
+    }
+  }, []);
+
   const handleToolDeactivate = useCallback(() => { setActiveTool('cursor'); }, []);
 
   const handleToggleReplay = useCallback(() => {
@@ -589,6 +667,7 @@ const App: React.FC = () => {
           isReplayActive={replayState.isActive}
           isAnalyzing={isAnalyzing}
           onToggleFullscreen={toggleFullscreen}
+          onJumpToLive={() => chartRef.current?.jumpToLive && chartRef.current.jumpToLive()}
         />
       )}
 
@@ -701,7 +780,7 @@ const App: React.FC = () => {
       )}
 
       {isIndicatorsOpen && <IndicatorsModal onClose={() => setIsIndicatorsOpen(false)} onSelectIndicator={handleIndicatorSelect} />}
-      {isSymbolSearchOpen && <SymbolSearchModal onClose={() => setIsSymbolSearchOpen(false)} onSelect={setActiveSymbol} />}
+      {isSymbolSearchOpen && <SymbolSearchModal onClose={() => setIsSymbolSearchOpen(false)} onSelect={handleSymbolSelect} />}
       {isToolSearchOpen && <ToolSearchModal onClose={() => setIsToolSearchOpen(false)} onSelectTool={(tool) => { handleToolSelect(tool); setIsToolSearchOpen(false); }} />}
       {isSideMenuOpen && <SideMenu isOpen={isSideMenuOpen} onClose={() => setIsSideMenuOpen(false)} />}
       {isGoToDateOpen && <GoToDateModal onClose={() => setIsGoToDateOpen(false)} onGoTo={(d) => console.log(d)} />}
