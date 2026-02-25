@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  X, 
-  CandlestickChart, 
-  Type, 
-  MoveDiagonal, 
-  Monitor, 
-  LayoutGrid, 
-  Bell, 
+import {
+  X,
+  CandlestickChart,
+  Type,
+  MoveDiagonal,
+  Monitor,
+  LayoutGrid,
+  Bell,
   Calendar,
   ChevronDown,
   ChevronUp
@@ -72,6 +72,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         ohlc: true,
         barChangeValues: true,
         volume: true,
+        showLastPrice: true,
+        showAskPrice: false,
         lastDayChange: false,
         indicatorTitles: true,
         indicatorInputs: true,
@@ -218,7 +220,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-[#1c1c1c] w-full max-w-[475px] h-[490px] rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-[#363a45] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-[#363a45]">
           <h2 className="text-[15px] font-bold text-gray-100 tracking-tight">Settings</h2>
@@ -235,11 +237,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center px-4 py-3 space-x-3 transition-colors ${
-                  activeTab === tab.id 
-                    ? 'bg-[#2d2d2d] text-white font-bold border-r-[2.5px] border-white' 
+                className={`w-full flex items-center px-4 py-3 space-x-3 transition-colors ${activeTab === tab.id
+                    ? 'bg-[#2d2d2d] text-white font-bold border-r-[2.5px] border-white'
                     : 'text-[#787b86] hover:bg-[#2d2d2d] hover:text-gray-200'
-                }`}
+                  }`}
               >
                 <tab.icon size={16} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
                 <span className="text-[11px] whitespace-nowrap truncate">{tab.label}</span>
@@ -256,7 +257,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[#363a45] flex items-center justify-between bg-[#131722] shrink-0">
           <div className="relative">
-            <button 
+            <button
               ref={templateTriggerRef}
               onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
               className={`flex items-center space-x-2 px-3 py-1.5 border border-[#363a45] rounded text-[11px] text-gray-200 hover:bg-white/5 transition-colors focus:ring-1 focus:ring-[#2962ff] ${isTemplateMenuOpen ? 'border-[#2962ff]' : ''}`}
@@ -264,13 +265,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
               <span>Template</span>
               {isTemplateMenuOpen ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
             </button>
-            
+
             {isTemplateMenuOpen && (
-              <div 
+              <div
                 ref={templateMenuRef}
                 className="absolute bottom-full mb-1 left-0 bg-[#1e222d] border border-[#363a45] rounded-md shadow-2xl py-1 min-w-[150px] animate-in slide-in-from-bottom-2 duration-150 z-[700]"
               >
-                <button 
+                <button
                   onClick={handleApplyDefaults}
                   className="w-full px-4 py-2 text-left text-[11px] text-gray-200 hover:bg-[#2a2e39] transition-colors"
                 >
@@ -281,13 +282,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             )}
           </div>
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={onClose}
               className="px-4 py-1 text-[11px] font-bold text-gray-300 bg-transparent border border-[#434651] rounded hover:bg-white/5 transition-colors"
             >
               Cancel
             </button>
-            <button 
+            <button
               onClick={() => { onSave(localSettings); onClose(); }}
               className="px-5 py-1 text-[11px] font-bold text-black bg-white rounded hover:bg-gray-200 transition-colors shadow-lg"
             >

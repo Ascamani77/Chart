@@ -8,6 +8,8 @@ export interface OHLCData {
   low: number;
   close: number;
   volume?: number;
+  volumeSource?: string;
+  volume_z?: number;
 }
 
 export interface VolumeData {
@@ -60,6 +62,8 @@ export interface ChartSettings {
     ohlc: boolean;
     barChangeValues: boolean;
     volume: boolean;
+    showLastPrice?: boolean;
+    showAskPrice?: boolean;
     lastDayChange: boolean;
     indicatorTitles: boolean;
     indicatorInputs: boolean;

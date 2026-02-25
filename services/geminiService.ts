@@ -4,14 +4,15 @@ import { OHLCData } from "../types";
 
 export const getMarketAnalysis = async (data: OHLCData[], symbol: string, imageData?: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+
   const recentData = data.slice(-25).map(d => {
-    const timeStr = typeof d.time === 'number' 
-      ? new Date(d.time * 1000).toISOString().split('T')[0] 
+    const timeStr = typeof d.time === 'number'
+      ? new Date(d.time * 1000).toISOString().split('T')[0]
       : String(d.time);
-    return `${timeStr}: H:${d.high} L:${d.low} C:${d.close}`;
+    const vz = (d as any).volume_z !== undefined ? ` Vz:${Number((d as any).volume_z).toFixed(2)}` : '';
+    return `${timeStr}: H:${d.high} L:${d.low} C:${d.close}${vz}`;
   }).join(' | ');
-  
+
   const textPart = {
     text: `Analyze the following chart for ${symbol}. 
     Data: ${recentData}.

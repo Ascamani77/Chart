@@ -49,6 +49,8 @@ export interface TradingChartHandle {
 interface TradingChartProps {
   data: OHLCData[];
   volumeData: VolumeData[];
+  lastPrice?: number | null;
+  askPrice?: number | null;
   style?: ChartStyle;
   symbol?: string;
   timeframe?: string;
@@ -114,6 +116,8 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const drawingSurfaceRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
+  const askLineRef = useRef<any | null>(null);
+  const lastLineRef = useRef<any | null>(null);
   const indicatorsRef = useRef<{ [key: string]: ISeriesApi<any> | ISeriesApi<any>[] }>({});
 
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
@@ -126,6 +130,19 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
   const [viewportCounter, setViewportCounter] = useState(0);
 
   const [displayOHLC, setDisplayOHLC] = useState<OHLCData | null>(null);
+  // Show OHLC by default when data loads if the status line setting enables it
+  useEffect(() => {
+    try {
+      const show = chartSettings?.statusLine?.ohlc !== false;
+      if (show && data && data.length > 0) {
+        setDisplayOHLC(data[data.length - 1]);
+      } else {
+        setDisplayOHLC(null);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [data, chartSettings?.statusLine?.ohlc]);
   const [isReady, setIsReady] = useState(false);
   const [showIndicatorLegend, setShowIndicatorLegend] = useState(true);
   const [hiddenIndicators, setHiddenIndicators] = useState<Set<string>>(new Set());
@@ -173,6 +190,120 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
       try { unsub(); } catch (e) { }
     };
   }, [chartRef.current, data]);
+
+  // Standalone effect to update the ask price line when askPrice prop changes
+  useEffect(() => {
+    // only show ask line when enabled in settings
+    if (!mainSeriesRef.current) return;
+    if (!chartSettings?.statusLine?.showAskPrice) {
+      if (askLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(askLineRef.current); } catch (e) { }
+        askLineRef.current = null;
+      }
+      return;
+    }
+    try {
+      if (askLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(askLineRef.current); } catch (e) { }
+        askLineRef.current = null;
+      }
+      if (typeof (props as any).askPrice === 'number' && !isNaN((props as any).askPrice)) {
+        askLineRef.current = mainSeriesRef.current.createPriceLine({
+          price: (props as any).askPrice,
+          color: 'rgba(41,98,255,0.95)',
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: true,
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+    return () => {
+      if (askLineRef.current && mainSeriesRef.current) {
+        try { mainSeriesRef.current.removePriceLine(askLineRef.current); } catch (e) { }
+        askLineRef.current = null;
+      }
+    };
+  }, [(props as any).askPrice, symbol, chartSettings?.statusLine?.showAskPrice]);
+
+  // Standalone effect to update the last price line when lastPrice prop changes
+  useEffect(() => {
+    if (!mainSeriesRef.current) return;
+    if (!chartSettings?.statusLine?.showLastPrice) {
+      if (lastLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(lastLineRef.current); } catch (e) { }
+        lastLineRef.current = null;
+      }
+      return;
+    }
+    try {
+      if (lastLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(lastLineRef.current); } catch (e) { }
+        lastLineRef.current = null;
+      }
+      if (typeof (props as any).lastPrice === 'number' && !isNaN((props as any).lastPrice)) {
+        lastLineRef.current = mainSeriesRef.current.createPriceLine({
+          price: (props as any).lastPrice,
+          color: 'rgba(255,255,255,0.9)',
+          lineWidth: 1,
+          lineStyle: 0,
+          axisLabelVisible: true,
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+    return () => {
+      if (lastLineRef.current && mainSeriesRef.current) {
+        try { mainSeriesRef.current.removePriceLine(lastLineRef.current); } catch (e) { }
+        lastLineRef.current = null;
+      }
+    };
+  }, [(props as any).lastPrice, symbol, chartSettings?.statusLine?.showLastPrice]);
+
+  // Helper to (re)create the ask price line when the main series is created or ask updates
+  const ensureAskLine = useCallback(() => {
+    if (!mainSeriesRef.current) return;
+    try {
+      if (askLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(askLineRef.current); } catch (e) { }
+        askLineRef.current = null;
+      }
+      if (typeof (props as any).askPrice === 'number' && !isNaN((props as any).askPrice)) {
+        askLineRef.current = mainSeriesRef.current.createPriceLine({
+          price: (props as any).askPrice,
+          color: 'rgba(41,98,255,0.95)',
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: true,
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [(props as any).askPrice, symbol]);
+  // Helper to (re)create the last price line when the main series is created or last updates
+  const ensureLastLine = useCallback(() => {
+    if (!mainSeriesRef.current) return;
+    try {
+      if (lastLineRef.current) {
+        try { mainSeriesRef.current.removePriceLine(lastLineRef.current); } catch (e) { }
+        lastLineRef.current = null;
+      }
+      if (typeof (props as any).lastPrice === 'number' && !isNaN((props as any).lastPrice)) {
+        lastLineRef.current = mainSeriesRef.current.createPriceLine({
+          price: (props as any).lastPrice,
+          color: 'rgba(255,255,255,0.9)',
+          lineWidth: 1,
+          lineStyle: 0,
+          axisLabelVisible: true,
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [(props as any).lastPrice, symbol]);
   const [showRectangleColorsId, setShowRectangleColorsId] = useState<string | null>(null);
 
   // Context Menu State
@@ -507,6 +638,9 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     }
 
     safeSetSeriesData(mainSeriesRef.current!, finalData);
+    // Ensure the ask and last price lines are present after (re)creating the main series
+    try { ensureAskLine(); } catch (e) { }
+    try { if (chartSettings?.statusLine?.showLastPrice && typeof (props as any).lastPrice !== 'undefined') ensureLastLine(); } catch (e) { }
 
     // Ensure priceScale is always configured with proper formatting
     const rightScale = chart.priceScale('right');
@@ -940,7 +1074,7 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
     );
   };
 
-  const statusLine = chartSettings?.statusLine || { logo: true, symbol: true, titleMode: 'Description', openMarketStatus: true, ohlc: true, indicatorTitles: true, volume: true };
+  const statusLine = chartSettings?.statusLine || { logo: true, symbol: true, titleMode: 'Description', openMarketStatus: true, ohlc: true, indicatorTitles: true, volume: true, showLastPrice: true, showAskPrice: false };
 
   return (
     <div
@@ -1451,6 +1585,13 @@ const TradingChart = forwardRef<TradingChartHandle, TradingChartProps>((props, r
               <span className="text-gray-400">H<span className="text-[#089981] ml-0.5">{displayOHLC.high}</span></span>
               <span className="text-gray-400">L<span className="text-[#f23645] ml-0.5">{displayOHLC.low}</span></span>
               <span className="text-gray-400">C<span className="text-white ml-0.5 font-bold">{displayOHLC.close}</span></span>
+              {/* Last traded price and ask price (if available and enabled in settings) */}
+              {statusLine.showLastPrice && (
+                <span className="text-gray-400">Last<span className="text-white ml-0.5 font-bold">{(props.lastPrice ?? data[data.length - 1]?.close ?? 0).toFixed(priceDecimalsFor(symbol))}</span></span>
+              )}
+              {statusLine.showAskPrice && typeof props.askPrice === 'number' && (
+                <span className="text-gray-400">Ask<span className="text-[#089981] ml-0.5">{(props.askPrice ?? 0).toFixed(priceDecimalsFor(symbol))}</span></span>
+              )}
             </div>
           )}
         </div>

@@ -13,6 +13,7 @@ import MetaTrader5 as mt5
 HTTP_PORT = int(os.environ.get('MT5_BRIDGE_PORT', '62100'))
 clients = set()
 subscriptions = {}   # broker_symbol -> set of websocket clients
+resolved_symbols = {}  # cache for resolved symbol names (requested -> broker name)
 
 def find_free_port(start_port=62100, range_size=50, extra_ranges=None):
     """Find the first available port starting from start_port.
@@ -47,6 +48,55 @@ def find_free_port(start_port=62100, range_size=50, extra_ranges=None):
 def ensure_mt5():
     if not mt5.initialize():
         raise RuntimeError("Failed to initialize MetaTrader5. Start the terminal and ensure API is enabled.")
+
+
+def resolve_symbol(requested_sym: str) -> str:
+    """Resolve a user-facing symbol like 'GBPUSD' to the broker's actual symbol name.
+    Tries exact match, case-insensitive match, contains match, and common suffix variations.
+    Caches results in `resolved_symbols` for performance.
+    """
+    if not requested_sym:
+        return requested_sym
+    if requested_sym in resolved_symbols:
+        return resolved_symbols[requested_sym]
+    try:
+        si = mt5.symbol_info(requested_sym)
+        if si is not None:
+            resolved_symbols[requested_sym] = requested_sym
+            return requested_sym
+    except Exception:
+        pass
+
+    try:
+        syms = mt5.symbols_get()
+        if syms:
+            # exact case-insensitive
+            for s in syms:
+                name = s.name if hasattr(s, 'name') else str(s)
+                if name.lower() == requested_sym.lower():
+                    resolved_symbols[requested_sym] = name
+                    return name
+            # contains
+            for s in syms:
+                name = s.name if hasattr(s, 'name') else str(s)
+                if requested_sym.lower() in name.lower():
+                    resolved_symbols[requested_sym] = name
+                    return name
+            # try common suffixes appended to requested symbol
+            suffixes = ['m', '.m', 'micro', '.ecn', 'i']
+            for suf in suffixes:
+                candidate = requested_sym + suf
+                for s in syms:
+                    name = s.name if hasattr(s, 'name') else str(s)
+                    if name.lower() == candidate.lower():
+                        resolved_symbols[requested_sym] = name
+                        return name
+    except Exception:
+        pass
+
+    # fallback to the requested symbol itself
+    resolved_symbols[requested_sym] = requested_sym
+    return requested_sym
 
 TF_MAP = {
     '1m': mt5.TIMEFRAME_M1,
@@ -94,17 +144,62 @@ async def handle_historical(request):
         return web.json_response({'bars': []})
     try:
         timeframe = TF_MAP.get(tf, mt5.TIMEFRAME_M1)
-        rates = mt5.copy_rates_from_pos(sym, timeframe, 0, limit)
+        print(f"[mt5_bridge] historical request: symbol={sym} timeframe={tf} limit={limit}")
+        # resolve broker symbol name if terminal uses suffixes (e.g. GBPUSDm)
+        try:
+            broker_sym = resolve_symbol(sym)
+            if broker_sym != sym:
+                print(f"[mt5_bridge] resolved symbol {sym} -> {broker_sym}")
+        except Exception as _e:
+            broker_sym = sym
+            print(f"[mt5_bridge] symbol resolution error: {_e}")
+
+        try:
+            si = mt5.symbol_info(broker_sym)
+            print(f"[mt5_bridge] symbol_info: {si}")
+        except Exception as _e:
+            print(f"[mt5_bridge] symbol_info error: {_e}")
+
+        rates = mt5.copy_rates_from_pos(broker_sym, timeframe, 0, limit)
+        if rates is None:
+            print(f"[mt5_bridge] copy_rates_from_pos returned None for {sym} tf={tf}")
+        else:
+            try:
+                print(f"[mt5_bridge] copy_rates_from_pos returned {len(rates)} records for {sym}")
+            except Exception:
+                pass
         bars = []
         if rates is not None:
-            for r in rates:
+            for idx, r in enumerate(rates):
                 # include volume if available (tick_volume or real_volume)
                 vol = 0
                 try:
-                    vol = int(r.get('tick_volume') or r.get('real_volume') or 0)
+                    # rates can be a numpy.record-like object, a tuple, or dict depending on mt5 binding
+                    if isinstance(r, dict):
+                        vol = int(r.get('tick_volume') or r.get('real_volume') or r.get('volume') or 0)
+                    else:
+                        # try dict-like access first
+                        try:
+                            vol = int(r['tick_volume'])
+                        except Exception:
+                            # fallback to attribute access
+                            vol = int(getattr(r, 'tick_volume', None) or getattr(r, 'real_volume', None) or getattr(r, 'volume', None) or 0)
                 except Exception:
                     vol = 0
+
                 bars.append({'time': int(r['time']), 'open': r['open'], 'high': r['high'], 'low': r['low'], 'close': r['close'], 'volume': vol})
+                # log the first bar for debugging volume availability
+                if idx == 0:
+                    try:
+                        # attempt to display tick_volume from multiple shapes
+                        tick_vol = None
+                        if isinstance(r, dict):
+                            tick_vol = r.get('tick_volume')
+                        else:
+                            tick_vol = getattr(r, 'tick_volume', None)
+                        print(f"[mt5_bridge] first bar -> time={int(r['time'])} tick_volume={tick_vol} volume_field={vol}")
+                    except Exception:
+                        pass
         # If MT5 returned finer-resolution bars (e.g. 1m) for a coarser requested timeframe
         # aggregate them into the requested timeframe buckets so frontend receives correct bars.
         def tf_to_seconds(tfs: str) -> int:
@@ -171,8 +266,25 @@ async def handle_tick(request):
     if not sym:
         return web.json_response({'error': 'missing symbol'}, status=400)
     try:
-        tick = mt5.symbol_info_tick(sym)
+        # resolve broker symbol name before requesting tick
+        try:
+            broker_sym = resolve_symbol(sym)
+            if broker_sym != sym:
+                print(f"[mt5_bridge] resolved symbol {sym} -> {broker_sym} for /tick")
+        except Exception as _e:
+            broker_sym = sym
+            print(f"[mt5_bridge] /tick symbol resolution error: {_e}")
+
+        tick = mt5.symbol_info_tick(broker_sym)
+        print(f"[mt5_bridge] /tick request for {broker_sym}")
+        try:
+            si = mt5.symbol_info(broker_sym)
+            print(f"[mt5_bridge] /tick symbol_info: {si}")
+        except Exception as _e:
+            print(f"[mt5_bridge] /tick symbol_info error: {_e}")
+
         if tick is None:
+            print(f"[mt5_bridge] symbol_info_tick returned None for {broker_sym}")
             return web.json_response({'symbol': sym, 'tick': None})
         t = int(getattr(tick, 'time', int(time.time())))
         bid = float(getattr(tick, 'bid', 0.0))
@@ -185,36 +297,44 @@ async def handle_tick(request):
 
 async def ws_handler(ws, path=None):
     clients.add(ws)
+    print(f"[mt5_bridge] WS client connected from {ws.remote_address}")
     try:
         async for raw in ws:
             try:
                 msg = json.loads(raw)
-            except Exception:
+                print(f"[mt5_bridge] WS received message: {msg}")
+            except Exception as e:
+                print(f"[mt5_bridge] WS message parse error: {e}")
                 continue
             action = msg.get('action')
             symbol = msg.get('symbol')
             if action == 'subscribe' and symbol:
                 subs = subscriptions.setdefault(symbol, set())
                 subs.add(ws)
+                print(f"[mt5_bridge] subscribed to {symbol}, total subscribers: {len(subscriptions)}")
             elif action == 'unsubscribe' and symbol:
                 subs = subscriptions.get(symbol)
                 if subs:
                     subs.discard(ws)
-    except Exception:
-        pass
+                print(f"[mt5_bridge] unsubscribed from {symbol}")
+    except Exception as e:
+        print(f"[mt5_bridge] WS handler error: {e}")
     finally:
         for subs in subscriptions.values():
             subs.discard(ws)
         clients.discard(ws)
+        print(f"[mt5_bridge] WS client disconnected")
 
 async def ticker_loop():
     ensure_mt5()
     last = {}
     while True:
         try:
-            for broker_sym, subs in list(subscriptions.items()):
+            for requested_sym, subs in list(subscriptions.items()):
                 if not subs:
                     continue
+                # Resolve the symbol name to broker format (e.g., BTCUSD -> BTCUSDm)
+                broker_sym = resolve_symbol(requested_sym)
                 tick = mt5.symbol_info_tick(broker_sym)
                 if tick is None:
                     continue
@@ -222,11 +342,11 @@ async def ticker_loop():
                 bid = float(tick.bid)
                 ask = float(tick.ask)
                 vol = int(getattr(tick, 'volume', 0) or 0)
-                key = f"{broker_sym}"
+                key = f"{requested_sym}"
                 prev = last.get(key)
                 if prev is None or (prev['bid'] != bid or prev['ask'] != ask or t != prev['time']):
                     last[key] = {'time': t, 'bid': bid, 'ask': ask}
-                    payload = json.dumps({'symbol': broker_sym, 'bid': bid, 'ask': ask, 'time': t, 'volume': vol})
+                    payload = json.dumps({'symbol': requested_sym, 'bid': bid, 'ask': ask, 'time': t, 'volume': vol})
                     dead = []
                     for ws in list(subs):
                         try:

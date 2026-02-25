@@ -1,7 +1,10 @@
 // mt5Service.ts — frontend bridge client for MT5 Python bridge
-const BRIDGE_HTTP = (import.meta.env.VITE_MT5_BRIDGE_URL as string) || 'http://localhost:62100';
+const BRIDGE_HTTP = (import.meta.env.VITE_MT5_BRIDGE_URL as string) || 'http://127.0.0.1:62100';
 // WebSocket runs on HTTP port + 1 by default
 const BRIDGE_WS = (import.meta.env.VITE_MT5_BRIDGE_WS_URL as string) || BRIDGE_HTTP.replace(/^http/, 'ws').replace(/:(\d+)$/, (_, p) => `:${Number(p) + 1}`);
+
+// Debug: log actual bridge URLs at startup
+try { console.log('[MT5] Bridge config: BRIDGE_HTTP=', BRIDGE_HTTP, 'BRIDGE_WS=', BRIDGE_WS); } catch (e) { }
 
 type Tick = { symbol: string; bid: number; ask: number; time: number; volume?: number };
 
@@ -19,16 +22,28 @@ const callbacks: Map<string, Set<(t: Tick) => void>> = new Map();
 const symbolCache: Map<string, string> = new Map();
 
 function ensureWs() {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        try { console.log('[MT5] ensureWs: ws already exists, state=', ws.readyState); } catch (e) { }
+        return;
+    }
+    try { console.log('[MT5] ensureWs: creating new WS to', BRIDGE_WS); } catch (e) { }
     ws = new WebSocket(BRIDGE_WS);
     ws.onopen = () => {
-        // resubscribe existing symbols
-        for (const sym of callbacks.keys()) {
-            ws!.send(JSON.stringify({ action: 'subscribe', symbol: sym }));
-        }
+        try {
+            console.log('[MT5] WS connected to', BRIDGE_WS, '(state=1). Subscribing to', Array.from(callbacks.keys()));
+            // resubscribe existing symbols
+            for (const sym of callbacks.keys()) {
+                try {
+                    ws!.send(JSON.stringify({ action: 'subscribe', symbol: sym }));
+                    console.log('[MT5] onopen: sent subscribe for', sym);
+                } catch (e) { console.error('[MT5] onopen subscribe error for', sym, e); }
+            }
+        } catch (e) { console.error('[MT5] WS onopen error', e); }
     };
     ws.onmessage = (ev) => {
         try {
+            // Log raw incoming frames for debugging
+            try { console.log('[MT5] WS onmessage raw:', ev.data); } catch (e) { }
             const data = JSON.parse(ev.data);
             const sym = data.symbol;
             if (!sym) return;
@@ -38,11 +53,11 @@ function ensureWs() {
                 for (const cb of Array.from(set)) cb(tick);
             }
         } catch (e) {
-            // ignore
+            console.error('[MT5] WS onmessage parse error', e);
         }
     };
-    ws.onclose = () => { ws = null; };
-    ws.onerror = () => { /* ignore */ };
+    ws.onclose = (ev) => { try { console.log('[MT5] WS closed', ev && ev.code ? ev.code : ''); } catch (e) { } ws = null; };
+    ws.onerror = (ev) => { try { console.error('[MT5] WS error', ev); } catch (e) { } };
 }
 
 export async function getHistoricalData(symbol: string, timeframe: string, limit = 5000, originalSymbol?: string) {
@@ -62,11 +77,48 @@ export async function getHistoricalData(symbol: string, timeframe: string, limit
         try {
             console.log(`[MT5] Raw historical response for ${symbol}: bars=${Array.isArray(j.bars) ? j.bars.length : 0}`);
             if (Array.isArray(j.bars) && j.bars.length > 0) {
-                console.log('[MT5] sample bar (first):', j.bars[0], 'sample bar (last):', j.bars[j.bars.length - 1]);
+                const first = j.bars[0];
+                const last = j.bars[j.bars.length - 1];
+                console.log(`[MT5] First bar: time=${first.time}, volume=${first.volume}, tick_volume=${first.tick_volume}`);
+                console.log(`[MT5] Last bar: time=${last.time}, volume=${last.volume}, tick_volume=${last.tick_volume}`);
+                console.log('[MT5] Full first bar object:', first);
             }
         } catch (e) { /* ignore logging errors */ }
         if (!Array.isArray(j.bars)) return [];
-        let bars = j.bars.map((b: any) => ({ time: Number(b.time), open: Number(b.open), high: Number(b.high), low: Number(b.low), close: Number(b.close), volume: Number(b.volume || b.tick_volume || 0) })) as any[];
+        // Map raw bars and determine which volume field was present on each bar.
+        let bars = j.bars.map((b: any) => {
+            const hasVolField = Object.prototype.hasOwnProperty.call(b, 'volume');
+            const hasTick = Object.prototype.hasOwnProperty.call(b, 'tick_volume');
+            const vol = Number(b.volume ?? b.tick_volume ?? 0);
+            const volSource = hasVolField ? 'volume' : (hasTick ? 'tick_volume' : 'none');
+            return {
+                time: Number(b.time),
+                open: Number(b.open),
+                high: Number(b.high),
+                low: Number(b.low),
+                close: Number(b.close),
+                volume: vol,
+                volumeSource: volSource,
+            } as any;
+        }) as any[];
+
+        // Compute per-symbol volume normalization (z-score) so AI can compare across symbols.
+        try {
+            const vols = bars.map(b => Number(b.volume || 0));
+            if (vols.length > 0) {
+                const mean = vols.reduce((a, c) => a + c, 0) / vols.length;
+                const variance = vols.reduce((a, c) => a + Math.pow(c - mean, 2), 0) / vols.length;
+                const std = Math.sqrt(variance);
+                for (let i = 0; i < bars.length; i++) {
+                    bars[i].volume_z = std > 0 ? (Number(bars[i].volume || 0) - mean) / std : 0;
+                }
+                // Log sample info about volume source and z-score for auditing
+                try {
+                    const first = bars[0];
+                    console.log(`[MT5] Volume sample for ${symbol}: source=${first.volumeSource}, volume=${first.volume}, volume_z=${first.volume_z}`);
+                } catch (e) { /* ignore logging errors */ }
+            }
+        } catch (e) { /* ignore normalization errors */ }
 
         // If bars are finer than requested timeframe, aggregate client-side to ensure correct buckets
         const timeframeToSeconds = (t: string) => {
@@ -132,6 +184,16 @@ export async function getHistoricalData(symbol: string, timeframe: string, limit
         // store in cache
         try { historicalCache.set(cacheKey, bars.slice()); } catch (e) { /* ignore cache failures */ }
 
+        // Log what we're actually returning
+        if (bars.length > 0) {
+            console.log(`[MT5] ✓ Returning ${bars.length} bars with volume data:`, {
+                first: bars[0],
+                last: bars[bars.length - 1],
+                hasVolumeField: 'volume' in bars[0],
+                firstVolume: bars[0].volume
+            });
+        }
+
         return bars;
     } catch (e) {
         return [];
@@ -192,9 +254,15 @@ export async function getLatestTick(symbol: string) {
 }
 
 export function subscribeToTicks(symbol: string, cb: (t: Tick) => void, originalSymbol?: string) {
+    try { console.log(`[MT5] subscribeToTicks called for ${symbol}`); } catch (e) { }
     ensureWs();
+    try { console.log(`[MT5] after ensureWs: ws state=${ws ? ws.readyState : 'null'}`); } catch (e) { }
     let set = callbacks.get(symbol);
-    if (!set) { set = new Set(); callbacks.set(symbol, set); }
+    if (!set) {
+        set = new Set();
+        callbacks.set(symbol, set);
+        console.log(`[MT5] added ${symbol} to callbacks map. Map now has:`, Array.from(callbacks.keys()));
+    }
 
     // Wrap callback to apply scaling if needed
     const wrappedCb = (tick: Tick) => {
@@ -210,7 +278,14 @@ export function subscribeToTicks(symbol: string, cb: (t: Tick) => void, original
 
     set.add(wrappedCb);
     // if ws is open, send subscribe
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'subscribe', symbol }));
+    try {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'subscribe', symbol }));
+            console.log(`[MT5] sent subscribe message for ${symbol}`);
+        } else {
+            console.log(`[MT5] ws not open for subscribe: ws=${ws}, state=${ws ? ws.readyState : 'null'} (will be sent in onopen)`);
+        }
+    } catch (e) { console.error(`[MT5] subscribe error`, e); }
 
     return () => {
         const s = callbacks.get(symbol);

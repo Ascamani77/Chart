@@ -226,9 +226,14 @@ const App: React.FC = () => {
   const [atrPeriod, setAtrPeriod] = useState(() => Number(localStorage.getItem('atrPeriod')) || 14);
 
   const [showVolume, setShowVolume] = useState(() => {
-    // Always start with volume hidden by default, reset any old localStorage value
-    localStorage.setItem('showVolume', 'false');
-    return false;
+    // Clear old false values and default to true to show volume
+    const stored = localStorage.getItem('showVolume');
+    if (stored === 'false') {
+      // Clear the old value so it defaults to true on next reload
+      localStorage.removeItem('showVolume');
+      return true;
+    }
+    return stored === 'true' || true;
   });
 
   // Persistence Sync Effects
@@ -285,6 +290,7 @@ const App: React.FC = () => {
   const [fullChartData, setFullChartData] = useState<ReturnType<typeof generateMockOHLC>>(() =>
     generateMockOHLC(chartDataConfig.count, chartDataConfig.interval, activeSymbol)
   );
+  const [latestTick, setLatestTick] = useState<{ bid: number; ask: number; time: number; volume?: number } | null>(null);
 
   useEffect(() => {
     // update replay data whenever fullChartData changes
@@ -299,19 +305,31 @@ const App: React.FC = () => {
 
     (async () => {
       try {
-        let hist = [];
+        let hist: any[] = [];
 
-        // Check if this is a bond symbol that uses FRED API
-        if (isBondSymbol(activeSymbol)) {
-          console.log(`[FRED] fetching bond data for ${activeSymbol}`);
-          hist = await getBondHistoricalData(activeSymbol, cfgCount);
-          console.log(`[FRED] historical bars for ${activeSymbol} count=`, (hist && hist.length) ? hist.length : 0);
-        } else {
-          // Otherwise use MT5 bridge
+        // Prefer MT5 data when available so we can use real MT5 volumes.
+        // Attempt MT5 first for all symbols; if MT5 returns no bars and the
+        // symbol is a bond, fall back to FRED historical data.
+        try {
           const brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
-          console.log(`MT5: using broker symbol '${brokerSymbol}' for UI symbol '${activeSymbol}'`);
-          hist = await mt5Service.getHistoricalData(brokerSymbol, timeframe, cfgCount, activeSymbol);
-          console.log(`MT5: historical bars for ${brokerSymbol} (UI ${activeSymbol}) count=`, (hist && hist.length) ? hist.length : 0);
+          console.log(`MT5: trying broker symbol '${brokerSymbol}' for UI symbol '${activeSymbol}'`);
+          const mt5bars = await mt5Service.getHistoricalData(brokerSymbol, timeframe, cfgCount, activeSymbol);
+          console.log(`MT5: returned bars for ${brokerSymbol} count=`, (mt5bars && mt5bars.length) ? mt5bars.length : 0);
+          if (mt5bars && mt5bars.length > 0) {
+            hist = mt5bars;
+          } else if (isBondSymbol(activeSymbol)) {
+            console.log(`[FRED] MT5 returned no bars; falling back to FRED for ${activeSymbol}`);
+            hist = await getBondHistoricalData(activeSymbol, cfgCount);
+            console.log(`[FRED] historical bars for ${activeSymbol} count=`, (hist && hist.length) ? hist.length : 0);
+          } else {
+            // keep empty — no MT5 data available for this symbol
+            console.log(`MT5: no data available for ${activeSymbol}`);
+          }
+        } catch (e) {
+          console.error('Error fetching MT5 data', e);
+          if (isBondSymbol(activeSymbol)) {
+            hist = await getBondHistoricalData(activeSymbol, cfgCount);
+          }
         }
 
         if (hist && hist.length > 0) {
@@ -358,8 +376,10 @@ const App: React.FC = () => {
             const forming = { time: currentBucket, open: openPrice, high: openPrice, low: openPrice, close: openPrice, volume: Number((latestTick && latestTick.volume) || 0) } as any;
             // if trimmed is empty, start with forming only; otherwise append
             const newData = trimmed.length ? trimmed.concat(forming).slice(-cfgCount) : [forming];
+            console.log('[App] Setting fullChartData:', { count: newData.length, firstBar: newData[0], lastBar: newData[newData.length - 1] });
             setFullChartData(newData);
           } else {
+            console.log('[App] Setting fullChartData (no forming needed):', { count: trimmed.length, firstBar: trimmed[0], lastBar: trimmed[trimmed.length - 1] });
             setFullChartData(trimmed);
           }
         } else {
@@ -373,8 +393,13 @@ const App: React.FC = () => {
         }
 
         // subscribe to ticks using the discovered broker symbol
+        console.log(`[App] About to subscribe to ticks for ${activeSymbol}`);
         const brokerSymbol = await mt5Service.findWorkingSymbol(activeSymbol, timeframe);
+        console.log(`[App] Resolved broker symbol: ${brokerSymbol}, calling subscribeToTicks`);
         unsub = mt5Service.subscribeToTicks(brokerSymbol, (tick: any) => {
+          // update latest tick for UI (last price and ask)
+          try { setLatestTick({ bid: Number(tick.bid || 0), ask: Number(tick.ask || 0), time: Number(tick.time || Date.now() / 1000), volume: Number(tick.volume || 0) }); } catch (e) { }
+
           setFullChartData(prev => {
             const tickTime = Math.floor((tick.time || Date.now() / 1000));
             const price = tick.bid; // use bid to match MT5 chart price
@@ -582,15 +607,11 @@ const App: React.FC = () => {
   const handleSymbolSelect = useCallback((symbol: string) => {
     setActiveSymbol(symbol);
     // When selecting a bond, force daily timeframe since FRED only has daily data
-    // and hide volume since FRED doesn't provide volume data
     if (isBondSymbol(symbol)) {
       setTimeframe('D');
-      setShowVolume(false);
-      console.log(`[Bond] Switching to daily timeframe and hiding volume for ${symbol}`);
-    } else {
-      // Restore volume visibility for non-bond symbols
-      setShowVolume(true);
+      console.log(`[Bond] Switching to daily timeframe for ${symbol}`);
     }
+    // Always keep current volume visibility (user can toggle via settings)
   }, []);
 
   const handleToolDeactivate = useCallback(() => { setActiveTool('cursor'); }, []);
@@ -689,6 +710,8 @@ const App: React.FC = () => {
               ref={chartRef}
               data={fullChartData} volumeData={fullVolumeData}
               symbol={activeSymbol} timeframe={timeframe} style={chartStyle}
+              lastPrice={latestTick ? latestTick.bid : fullChartData[fullChartData.length - 1]?.close}
+              askPrice={latestTick ? latestTick.ask : undefined}
               activeTool={activeTool} drawings={drawings} onDrawingsChange={setDrawings}
               onToolDeactivate={handleToolDeactivate} stayInDrawingMode={stayInDrawingMode}
               onDrawingSelect={() => { }}
